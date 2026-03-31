@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Credits — BrewRig</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#1a1108">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #1a1108;
+      --surface: #261a0d;
+      --surface2: #2e2010;
+      --border: #4a3420;
+      --accent: #c8874a;
+      --accent2: #e6a96a;
+      --text-primary: #f5ead8;
+      --text-muted: #c4a882;
+      --text-dim: #8a6e54;
+      --body-font: "Noto Sans JP", sans-serif;
+      --timer-font: "DM Mono", monospace;
+      --header-bg: #1a1108e6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--body-font);
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100dvh;
+      line-height: 1.7;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--header-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.82rem;
+      padding: 0.3rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface2);
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .back-btn:hover { border-color: var(--accent); color: var(--accent2); }
+    .header-title {
+      font-family: Montserrat, sans-serif;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--accent2);
+      letter-spacing: 0.06em;
+    }
+    .header-sub {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-left: 0.1rem;
+    }
+    main {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+    h1 {
+      font-family: Montserrat, sans-serif;
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--accent2);
+      letter-spacing: 0.06em;
+      margin-bottom: 0.5rem;
+    }
+    .lead {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-bottom: 1.75rem;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .card-title {
+      font-family: Montserrat, sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 1rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    tr + tr td, tr + tr th {
+      border-top: 1px solid var(--border);
+    }
+    th, td {
+      padding: 0.55rem 0;
+      font-size: 0.82rem;
+      vertical-align: top;
+    }
+    th {
+      color: var(--text-dim);
+      font-weight: 500;
+      width: 5.5rem;
+      padding-right: 1rem;
+      white-space: nowrap;
+    }
+    td { color: var(--text-muted); }
+    a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      word-break: break-all;
+      transition: color 0.15s;
+    }
+    a:hover { color: var(--accent2); }
+
+    /* Narrow screens: stack th/td vertically */
+    @media (max-width: 400px) {
+      table, tbody, tr, th, td { display: block; width: 100%; }
+      tr + tr { border-top: 1px solid var(--border); }
+      tr + tr td, tr + tr th { border-top: none; }
+      th {
+        padding: 0.55rem 0 0.1rem;
+        white-space: normal;
+        width: auto;
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      td { padding: 0 0 0.55rem; }
+    }
+    .note {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      margin-top: 1rem;
+      line-height: 1.6;
+    }
+    footer {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.7rem;
+      padding: 1rem 1rem 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="back-btn" href="./coffee-drip-timer.html">← 戻る</a>
+  <span class="header-title">BrewRig</span>
+  <span class="header-sub">Credits</span>
+</header>
+
+<main>
+  <h1>Credits</h1>
+  <p class="lead">本サイトで使用している素材のクレジットを記載しています。</p>
+
+  <div class="card">
+    <p class="card-title">アイコン</p>
+    <table>
+      <tr>
+        <th>名称</th>
+        <td>Barista Beverage Bottle</td>
+      </tr>
+      <tr>
+        <th>提供元</th>
+        <td><a href="https://www.svgrepo.com/" target="_blank" rel="noopener noreferrer">SVG Repo</a></td>
+      </tr>
+      <tr>
+        <th>元URL</th>
+        <td><a href="https://www.svgrepo.com/svg/427618/barista-beverage-bottle" target="_blank" rel="noopener noreferrer">svgrepo.com/svg/427618/barista-beverage-bottle</a></td>
+      </tr>
+      <tr>
+        <th>ライセンス</th>
+        <td><a href="https://www.svgrepo.com/page/licensing/#CC%20Attribution" target="_blank" rel="noopener noreferrer">CC Attribution License</a></td>
+      </tr>
+      <tr>
+        <th>変更点</th>
+        <td>色の変更（原作者は加工後のアイコンを承認・推奨しているわけではありません）</td>
+      </tr>
+    </table>
+    <p class="note">CC Attribution License に基づき、上記のクレジットを表示しています。</p>
+  </div>
+</main>
+
+<footer>
+  <a class="back-btn" href="./coffee-drip-timer.html">← 戻る</a>
+  <p>&copy; 2025 KOROHUNK</p>
+</footer>
+
+</body>
+</html>
