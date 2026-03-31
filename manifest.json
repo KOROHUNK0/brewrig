@@ -1,0 +1,31 @@
+{
+  "name": "BrewRig - コーヒードリップタイマー",
+  "short_name": "BrewRig",
+  "description": "様々なドリップレシピに対応した、コーヒードリップ・湯量管理タイマー",
+  "start_url": "./coffee-drip-timer.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1108",
+  "theme_color": "#1a1108",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["utilities", "lifestyle"]
+}
