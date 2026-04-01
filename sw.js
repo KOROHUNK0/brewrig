@@ -1,14 +1,16 @@
-const CACHE_NAME = 'brewrig-v1';
+const CACHE_NAME = 'brewrig-v3';
 const ASSETS = [
-  './coffee-drip-timer.html',
+  './index.html',
+  './app.js',
+  './app.css',
   './manifest.json',
+  './credits.html',
+  './assets/favicon.svg',
   './assets/icon-192.png',
   './assets/icon-512.png',
-  './assets/favicon.svg',
   './assets/submit-button-click2.mp3',
 ];
 
-// インストール: 全アセットをキャッシュ
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
@@ -16,7 +18,6 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// アクティベート: 古いキャッシュを削除
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -26,14 +27,12 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// フェッチ: キャッシュ優先、なければネットワーク
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(cached => {
       return cached || fetch(event.request).catch(() => {
-        // オフライン時にHTMLリクエストにはメインページを返す
         if (event.request.destination === 'document') {
-          return caches.match('./coffee-drip-timer.html');
+          return caches.match('./index.html');
         }
       });
     })
