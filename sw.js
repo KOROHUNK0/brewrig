@@ -2,10 +2,10 @@ const CACHE_NAME = 'brewrig-v1';
 const ASSETS = [
   './coffee-drip-timer.html',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './favicon.svg',
-  './asset/submit-button-click2.mp3',
+  './assets/icon-192.png',
+  './assets/icon-512.png',
+  './assets/favicon.svg',
+  './assets/submit-button-click2.mp3',
 ];
 
 // インストール: 全アセットをキャッシュ
