@@ -60,6 +60,12 @@
       transition: border-color 0.15s, color 0.15s;
     }
     .back-btn:hover { border-color: var(--accent); color: var(--accent2); }
+    .header-icon {
+      width: 1.6rem;
+      height: 1.6rem;
+      flex-shrink: 0;
+      display: block;
+    }
     .header-title {
       font-family: Montserrat, sans-serif;
       font-size: 1.1rem;
@@ -176,6 +182,7 @@
 
 <header>
   <a class="back-btn" href="https://korohunk0.github.io/brewrig/">← 戻る</a>
+  <img src="./assets/favicon.svg" class="header-icon" alt="" onerror="this.style.display='none'">
   <span class="header-title">BrewRig</span>
   <span class="header-sub">Credits</span>
 </header>
