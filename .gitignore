@@ -4,3 +4,16 @@ coffee-drip-timer.html
 
 .claude/settings.local.json
 .env.local
+
+# Node
+node_modules
+*.log
+
+# Build output
+dist
+.vite
+
+# TypeScript build info
+*.tsbuildinfo
+
+backup/
