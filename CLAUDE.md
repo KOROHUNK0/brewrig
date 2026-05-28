@@ -15,15 +15,15 @@
 
 ## ビルドの非自明な仕様
 
-`vite.config.ts` の `fixManifestPath` プラグインがビルド後 `dist/index.html` を後加工し、PWA マニフェストのパスを修正する:
+PWA マニフェスト (`manifest.json`) は `public/` ではなく**プロジェクト直下** (`index.html` の隣) に置いている。理由:
 
-- `viteSingleFile` は `<link rel="manifest" href="./manifest.json">` を `./assets/manifest.json` に書き換え、`dist/assets/manifest.json` を重複生成する。
-- 一方 `public/sw.js` の `ASSETS` リストはルート直下の `./manifest.json` をキャッシュ対象に指定している (public/ から `dist/manifest.json` に自動コピーされる)。
-- 後加工で href を `./manifest.json` に戻し、重複した `dist/assets/manifest.json` を削除することで、SW キャッシュとブラウザのマニフェスト要求パスを揃え、オフライン PWA のマニフェスト取得失敗を防ぐ。
+- Vite は `<link rel="manifest">` を HTML アセットとして追跡し、`assetFileNames` のルールに従って dist 配下に出力する。
+- 既定の `assetFileNames: 'assets/[name][extname]'` のままだと `dist/assets/manifest.json` に出力され、HTML 内の href もそれに合わせて書き換えられる。
+- 一方 `public/sw.js` は `./manifest.json` (root) を `ASSETS` リストでキャッシュしているため、上記のままでは SW キャッシュと HTML の要求パスが食い違い、オフライン時に PWA マニフェストの取得が失敗する。
 
-backup/ の旧 HTML と「見た目・動作上ほぼ同一」となれば十分で、HTML のバイトレベル一致は不要 (script 位置や `crossorigin` 属性のような実機能に影響しない差分は揃えない)。
+これを後加工せずに解決するため、`vite.config.ts` の `assetFileNames` を関数化して **`manifest.json` だけ root に出力** する特例を入れている (それ以外は `assets/` 行き)。マニフェストを `public/` から外しているのも、`public/` 自動コピー経路と Vite のアセット追跡経路の出力先衝突を避けるため (同じ `dist/manifest.json` を取り合う)。
 
-`assetsInlineLimit: 100_000_000` と `cssCodeSplit: false` で全アセットを HTML にインライン化する設計。`base: './'` は GitHub Pages のサブパスでも動かすため。
+`assetsInlineLimit: 100_000_000` と `cssCodeSplit: false` で JS/CSS は HTML にインライン化する設計。`base: './'` は GitHub Pages のサブパスでも動かすため。`vite:singlefile` がビルド時に「NOTE: asset not inlined: manifest.json」と出すのは仕様 (マニフェストは `<link>` 経由で参照される独立ファイルである必要があるためインラインにできない)。
 
 ## デプロイ
 
@@ -37,7 +37,8 @@ backup/ の旧 HTML と「見た目・動作上ほぼ同一」となれば十分
 - `src/i18n/strings.ts` — ja/en の文言。`Lang` 型は `'ja' | 'en'`。
 - `src/hooks/cookie.ts` — 永続化は `localStorage` ではなく **Cookie** (`recipeId`, `seVolume`)。SameSite=Lax / 365 日。
 - `src/components/` — 単機能カード単位 (`RecipeCard` / `SettingsCard` / `TimerCard` / `Header` / `Dialogs` / `SegSlider` 等)。
-- `public/sw.js` — Service Worker。`./manifest.json` は `fixManifestPath` の処理で整合しているが、`ASSETS` リスト内の `./app.js` / `./app.css` / `./assets/submit-button-click2.mp3` は旧バンドル時代の名残で実ファイル名 (singlefile 化済み HTML / `_submit-button-click2.mp3`) と一致しない。これらは初回オンライン取得経由でキャッシュに乗る前提。触る場合は要確認。
+- `manifest.json` — PWA マニフェスト。プロジェクト直下に置く (理由は「ビルドの非自明な仕様」参照)。
+- `public/sw.js` — Service Worker。`./manifest.json` は `assetFileNames` の root 配置と整合しているが、`ASSETS` リスト内の `./app.js` / `./app.css` / `./assets/submit-button-click2.mp3` は旧バンドル時代の名残で実ファイル名 (singlefile 化済み HTML / `_submit-button-click2.mp3`) と一致しない。これらは初回オンライン取得経由でキャッシュに乗る前提。触る場合は要確認。
 - `public/credits.html` — JS バンドル対象外の静的ページ。
 
 ## TypeScript
@@ -46,6 +47,7 @@ backup/ の旧 HTML と「見た目・動作上ほぼ同一」となれば十分
 
 ## 編集時の注意
 
-- バックアップとのパリティ目的で残している命名・構造には手を加えない (前述の `src/audio/se.ts`)。`fixManifestPath` プラグインも単なる整形ではなく PWA オフライン挙動を成立させる修正なので削らない。
+- バックアップとのパリティ目的で残している命名・構造には手を加えない (前述の `src/audio/se.ts`)。
 - 単一 HTML 出力前提のため、追加アセットを `public/` に置く際は SW のキャッシュリストと整合性を確認する。
+- `manifest.json` を `public/` に戻したり、`assetFileNames` の関数を一律 `'assets/[name][extname]'` に戻したりすると、SW キャッシュと HTML 要求パスのズレが再発する。変更する場合は両者の同期を保つこと。
 - レシピの全所要時間は `FINISH_TIME` に揃える。これを変えると `App.tsx` の終了センチネル (`FINISH_SENTINEL = 99`) ロジックと SE 発火タイミングに波及する。
