@@ -4,6 +4,7 @@ import type {
   FlavorKey,
   Lang,
   RecipeId,
+  SoundMode,
   StrengthKey,
   Theme,
 } from './types';
@@ -17,6 +18,8 @@ import {
   playStart,
   playStep,
 } from './audio/se';
+import { cancelSpeech, isTtsSupported, speak } from './audio/tts';
+import { buildFinishTts, buildStepTts } from './audio/tts-phrases';
 import { formatTime, isMobileUserAgent } from './utils/format';
 import { Header } from './components/Header';
 import { RecipeCard } from './components/RecipeCard';
@@ -40,6 +43,19 @@ export function App() {
     if (Number.isFinite(parsed)) return Math.min(seVolumeMax, Math.max(0, parsed));
     return seVolumeDefault;
   })();
+  const ttsSupported = useMemo(isTtsSupported, []);
+  const cookieSoundModeRaw = getCookie('soundMode');
+  const cookieSoundEnabledRaw = getCookie('soundEnabled');
+  const initialSoundEnabled = (() => {
+    if (cookieSoundEnabledRaw != null) return cookieSoundEnabledRaw !== '0';
+    if (cookieSoundModeRaw === 'off') return false;
+    return true;
+  })();
+  const initialSoundMode: SoundMode = (() => {
+    if (cookieSoundModeRaw === 'tts' && ttsSupported) return 'tts';
+    if (cookieSoundModeRaw === 'se') return 'se';
+    return 'se';
+  })();
 
   // State
   const [lang, setLang] = useState<Lang>('ja');
@@ -51,7 +67,8 @@ export function App() {
   const [strength, setStrength] = useState<StrengthKey>('normal');
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [seMuted, setSeMuted] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(initialSoundEnabled);
+  const [soundMode, setSoundMode] = useState<SoundMode>(initialSoundMode);
   const [seVolume, setSeVolume] = useState<number>(initialSeVolume);
   const [activeStep, setActiveStep] = useState<number | null>(0);
   const [finished, setFinished] = useState(false);
@@ -75,6 +92,12 @@ export function App() {
   useEffect(() => {
     setCookie('seVolume', String(seVolume));
   }, [seVolume]);
+  useEffect(() => {
+    setCookie('soundMode', soundMode);
+  }, [soundMode]);
+  useEffect(() => {
+    setCookie('soundEnabled', soundEnabled ? '1' : '0');
+  }, [soundEnabled]);
 
   const t = getStrings(lang);
   const recipe = useMemo(() => getRecipeById(recipeId), [recipeId]);
@@ -113,6 +136,10 @@ export function App() {
     };
   }, [isPlaying]);
 
+  const seActive = soundEnabled && soundMode === 'se';
+  const ttsActive = soundEnabled && soundMode === 'tts' && ttsSupported;
+  const ttsVolume = seVolumeMax > 0 ? Math.min(1, seVolume / seVolumeMax) : 0;
+
   // Step firing
   useEffect(() => {
     if (!isPlaying) return;
@@ -121,7 +148,16 @@ export function App() {
         firedRef.current.add(i);
         setActiveStep(i);
         setHighlightStep(i);
-        if (!seMuted) playStep(getAudioContext(), seVolume);
+        if (seActive) playStep(getAudioContext(), seVolume);
+        if (ttsActive) {
+          const cumulative = steps
+            .slice(0, i + 1)
+            .reduce((a, x) => a + x.amount, 0);
+          speak(buildStepTts(step, i, cumulative, t, lang), {
+            lang,
+            volume: ttsVolume,
+          });
+        }
         window.setTimeout(() => setHighlightStep(null), 2000);
       }
     });
@@ -132,9 +168,33 @@ export function App() {
       firedRef.current.add(FINISH_SENTINEL);
       setFinished(true);
       setActiveStep(null);
-      if (!seMuted) playFinish(getAudioContext(), seVolume);
+      if (seActive) playFinish(getAudioContext(), seVolume);
+      if (ttsActive) {
+        speak(buildFinishTts(t), { lang, volume: ttsVolume });
+      }
     }
-  }, [currentTime, isPlaying, steps, seMuted, seVolume, finished]);
+  }, [
+    currentTime,
+    isPlaying,
+    steps,
+    seActive,
+    seVolume,
+    finished,
+    ttsActive,
+    ttsVolume,
+    lang,
+    t,
+  ]);
+
+  // Cancel speech whenever TTS is no longer the active mode or language changes.
+  useEffect(() => {
+    if (!ttsSupported) return;
+    if (!ttsActive) cancelSpeech();
+  }, [ttsActive, ttsSupported]);
+  useEffect(() => {
+    if (!ttsSupported) return;
+    cancelSpeech();
+  }, [lang, ttsSupported]);
 
   // Theme attr on body? The bundle uses `data-theme` on the .app div itself.
   // No extra effect needed; we set it via attribute.
@@ -146,6 +206,7 @@ export function App() {
     setHighlightStep(null);
     setFinished(false);
     firedRef.current = new Set();
+    cancelSpeech();
   }, []);
 
   const guardChange = useCallback(
@@ -183,7 +244,14 @@ export function App() {
       firedRef.current.add(0);
       setActiveStep(0);
       setHighlightStep(0);
-      if (!seMuted) void playStart(ctx, seVolume);
+      if (seActive) void playStart(ctx, seVolume);
+      if (ttsActive && steps[0]) {
+        const cumulative = steps[0].amount;
+        speak(buildStepTts(steps[0], 0, cumulative, t, lang), {
+          lang,
+          volume: ttsVolume,
+        });
+      }
       window.setTimeout(() => setHighlightStep(null), 2000);
     }
     setIsPlaying(true);
@@ -192,6 +260,7 @@ export function App() {
   // `ct` in bundle: stop the timer (no SE).
   function pause() {
     setIsPlaying(false);
+    cancelSpeech();
   }
 
   // `lt` in bundle: always opens the confirm dialog (no idle short-circuit).
@@ -232,7 +301,17 @@ export function App() {
       open: true,
       message: t.confirmSkip(step.label, formatTime(step.timeSeconds), verb),
       onOk: () => {
+        cancelSpeech();
         jumpHelper(step.timeSeconds);
+        if (ttsActive) {
+          const cumulative = steps
+            .slice(0, idx + 1)
+            .reduce((a, x) => a + x.amount, 0);
+          speak(buildStepTts(step, idx, cumulative, t, lang), {
+            lang,
+            volume: ttsVolume,
+          });
+        }
         if (wasPlaying) window.setTimeout(() => setIsPlaying(true), 50);
       },
     });
@@ -246,6 +325,7 @@ export function App() {
       open: true,
       message: t.confirmFinish(formatTime(FINISH_TIME)),
       onOk: () => {
+        cancelSpeech();
         const newSet = new Set<number>();
         steps.forEach((_st, i) => newSet.add(i));
         firedRef.current = newSet;
@@ -326,11 +406,14 @@ export function App() {
           finished={finished}
           activeIndex={activeStep}
           highlightIndex={highlightStep}
-          seMuted={seMuted}
+          soundEnabled={soundEnabled}
+          soundMode={soundMode}
+          ttsSupported={ttsSupported}
           seVolume={seVolume}
           seVolumeMax={seVolumeMax}
           seVolumeStep={seVolumeStep}
-          toggleMute={() => setSeMuted((v) => !v)}
+          toggleSoundEnabled={() => setSoundEnabled((v) => !v)}
+          setSoundMode={setSoundMode}
           setSeVolume={setSeVolume}
           onStart={start}
           onPause={pause}

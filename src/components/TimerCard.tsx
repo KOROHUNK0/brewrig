@@ -1,8 +1,9 @@
 import { Fragment } from 'react';
-import type { Lang, PourStep } from '../types';
+import type { Lang, PourStep, SoundMode } from '../types';
 import { FINISH_TIME } from '../data/recipes';
 import { getStrings } from '../i18n/strings';
 import { formatTime } from '../utils/format';
+import { SegSlider } from './SegSlider';
 interface Props {
   lang: Lang;
   steps: PourStep[];
@@ -11,11 +12,14 @@ interface Props {
   finished: boolean;
   activeIndex: number | null;
   highlightIndex: number | null;
-  seMuted: boolean;
+  soundEnabled: boolean;
+  soundMode: SoundMode;
+  ttsSupported: boolean;
   seVolume: number;
   seVolumeMax: number;
   seVolumeStep: number;
-  toggleMute(): void;
+  toggleSoundEnabled(): void;
+  setSoundMode(m: SoundMode): void;
   setSeVolume(n: number): void;
   onStart(): void;
   onPause(): void;
@@ -53,11 +57,14 @@ export function TimerCard({
   finished,
   activeIndex,
   highlightIndex,
-  seMuted,
+  soundEnabled,
+  soundMode,
+  ttsSupported,
   seVolume,
   seVolumeMax,
   seVolumeStep,
-  toggleMute,
+  toggleSoundEnabled,
+  setSoundMode,
   setSeVolume,
   onStart,
   onPause,
@@ -186,35 +193,52 @@ export function TimerCard({
               </button>
             </div>
             <div className="controls-se">
-              <button
-                className={`btn-se-toggle ${seMuted ? 'se-off' : 'se-on'}`}
-                onClick={toggleMute}
-              >
-                <span className="se-toggle-icon">{seMuted ? '🔇' : '🔔'}</span>
-                <span className="se-toggle-track">
-                  <span className="se-toggle-thumb" />
-                </span>
-                <span className="se-toggle-label">SE</span>
-              </button>
-              <div
-                className={`se-volume-wrap ${seMuted ? 'se-vol-muted' : ''}`}
-              >
-                <span className="se-vol-icon">🔈</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={seVolumeMax}
-                  step={seVolumeStep}
-                  value={seVolume}
-                  onChange={(e) => setSeVolume(Number(e.target.value))}
-                  className="se-volume-slider"
-                  disabled={seMuted}
-                />
-                <span className="se-vol-icon">🔊</span>
-                <span className="se-vol-pct">
-                  {Math.round((seVolume / seVolumeMax) * 100)}%
-                </span>
+              <div className="sound-row sound-row-top">
+                <button
+                  className={`btn-se-toggle ${soundEnabled ? 'se-on' : 'se-off'}`}
+                  onClick={toggleSoundEnabled}
+                >
+                  <span className="se-toggle-icon">
+                    {soundEnabled ? '🔔' : '🔇'}
+                  </span>
+                  <span className="se-toggle-track">
+                    <span className="se-toggle-thumb" />
+                  </span>
+                  <span className="se-toggle-label">{s.soundLabel}</span>
+                </button>
+                {soundEnabled && ttsSupported && (
+                  <div className="sound-mode-seg">
+                    <SegSlider<SoundMode>
+                      options={[
+                        { value: 'se', label: s.soundSe },
+                        { value: 'tts', label: s.soundTts },
+                      ]}
+                      value={soundMode}
+                      onChange={setSoundMode}
+                    />
+                  </div>
+                )}
               </div>
+              {soundEnabled && (
+                <div className="sound-row sound-row-bottom">
+                  <div className="se-volume-wrap">
+                    <span className="se-vol-icon">🔈</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={seVolumeMax}
+                      step={seVolumeStep}
+                      value={seVolume}
+                      onChange={(e) => setSeVolume(Number(e.target.value))}
+                      className="se-volume-slider"
+                    />
+                    <span className="se-vol-icon">🔊</span>
+                    <span className="se-vol-pct">
+                      {Math.round((seVolume / seVolumeMax) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

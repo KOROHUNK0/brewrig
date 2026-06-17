@@ -85,6 +85,24 @@ export interface Strings {
   hybridIcedLabel: string;
   sourcePrefix: string;
   icedPrep: string;
+  soundLabel: string;
+  soundSe: string;
+  soundTts: string;
+  ttsPourTo(n: number): string;
+  ttsPourRange(a: number, b: number): string;
+  ttsStir: string;
+  ttsSwitchClose: string;
+  ttsSwitchOpen: string;
+  ttsSwitchOpenContinue: string;
+  ttsSwitchClosePour: string;
+  ttsSwitchRelease: string;
+  ttsPour1Hybrid: string;
+  ttsSwitchOpenContinueHot: string;
+  ttsSwitchOpenStir: string;
+  ttsSwitchOpenStir2: string;
+  ttsSwitchCloseIced: string;
+  ttsSwitchReleaseIced: string;
+  ttsFinish: string;
 }
 
 const ja: Strings = {
@@ -181,6 +199,27 @@ const ja: Strings = {
   hybridIcedLabel: 'ハイブリッドメソッド #ICED',
   sourcePrefix: '出典: ',
   icedPrep: 'コーヒーサーバーに十分な氷を入れておく',
+  soundLabel: 'サウンド',
+  soundSe: '🔔 SE',
+  soundTts: '🗣 ガイダンス',
+  ttsPourTo: (n) => `${n}グラムまで注いでください`,
+  ttsPourRange: (a, b) => `${a}グラムから${b}グラムまで注いでください`,
+  ttsStir: '投入後、ドリッパーを軽く揺すって撹拌してください',
+  ttsSwitchClose: 'スイッチを閉鎖した状態で、お湯を注いでください',
+  ttsSwitchOpen: 'スイッチを開放して、お湯を注いでください',
+  ttsSwitchOpenContinue: 'スイッチを開放した状態で、お湯を注いでください',
+  ttsSwitchClosePour: 'スイッチを閉鎖し、75度前後のお湯を注いでください',
+  ttsSwitchRelease: 'スイッチを解放してください',
+  ttsPour1Hybrid: 'スイッチを閉鎖した状態で、粉全体が浸る程度までお湯を注いでください',
+  ttsSwitchOpenContinueHot:
+    'スイッチを開放した状態で、お湯を注いでください。投入後、ゆおんを75度まで下げてください',
+  ttsSwitchOpenStir:
+    'スイッチを開放した状態でお湯を注ぎ、投入後にドリッパーを揺すって撹拌してください',
+  ttsSwitchOpenStir2:
+    'スイッチを開放した状態でお湯を注ぎ、撹拌してください。投入後、ゆおんを75度まで下げてください',
+  ttsSwitchCloseIced: 'スイッチを閉鎖し、75度前後のお湯を注いでください',
+  ttsSwitchReleaseIced: 'スイッチを解放してください',
+  ttsFinish: '抽出が完了しました',
 };
 
 const en: Strings = {
@@ -277,6 +316,27 @@ const en: Strings = {
   hybridIcedLabel: 'Hybrid Method #ICED',
   sourcePrefix: 'Source: ',
   icedPrep: 'Fill the coffee server with plenty of ice beforehand.',
+  soundLabel: 'Sound',
+  soundSe: '🔔 SE',
+  soundTts: '🗣 Voice',
+  ttsPourTo: (n) => `Pour up to ${n} grams.`,
+  ttsPourRange: (a, b) => `Pour ${a} to ${b} grams.`,
+  ttsStir: 'After pouring, gently swirl the dripper to stir.',
+  ttsSwitchClose: 'Keep the switch closed and pour water.',
+  ttsSwitchOpen: 'Open the switch and pour water.',
+  ttsSwitchOpenContinue: 'Keep the switch open and pour water.',
+  ttsSwitchClosePour: 'Close the switch and pour water at around 75 degrees.',
+  ttsSwitchRelease: 'Release the switch.',
+  ttsPour1Hybrid: 'Keep the switch closed and pour just enough water to saturate the grounds.',
+  ttsSwitchOpenContinueHot:
+    'Keep the switch open and pour water. After pouring, lower the water temperature to around 75 degrees.',
+  ttsSwitchOpenStir:
+    'Keep the switch open and pour water, then swirl the dripper to stir after pouring.',
+  ttsSwitchOpenStir2:
+    'Keep the switch open and pour water, then stir. After pouring, lower the water temperature to around 75 degrees.',
+  ttsSwitchCloseIced: 'Close the switch and pour water at around 75 degrees.',
+  ttsSwitchReleaseIced: 'Release the switch.',
+  ttsFinish: 'Brewing is complete.',
 };
 
 const dict: Record<Lang, Strings> = { ja, en };

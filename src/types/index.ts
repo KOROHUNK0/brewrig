@@ -10,6 +10,8 @@ export type FlowType = 'immersion' | 'percolation';
 
 export type RecipeId = 'hot' | 'iced' | 'hybrid' | 'hybrid-iced';
 
+export type SoundMode = 'se' | 'tts';
+
 export interface PourStep {
   timeSeconds: number;
   label: string;
