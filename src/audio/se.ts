@@ -3,8 +3,9 @@
 // The bundle defines 13 step cues and 13 finish cues (`current`, A..G, D2..D6),
 // selected at runtime by a variant key. The active variant is fixed at 'F' in
 // state (no UI to change it) — `w` (step) and `T` (finish) — but we port every
-// variant so the engine matches the original. The start cue (`ot`) plays an
-// MP3 buffer with `it` (the F-variant step cue) as a synthesized fallback.
+// variant so the engine matches the original. The start cue (`ot`) uses the
+// synthesized F-variant step cue (`it`) directly — it references no external
+// audio file (see `playStart`).
 //
 // Variable names follow the bundle: parameter `e` is the AudioContext,
 // `t` is the gain multiplier (== volume).
@@ -625,25 +626,15 @@ export function playFinish(
 }
 
 /**
- * Start cue (`ot` in bundle): play the bundled MP3 click; on any failure,
- * fall back to the synthesized step cue.
+ * Start cue (`ot` in bundle): the synthesized F-variant step cue. References
+ * no external audio file. (The original bundle fetched an MP3 here, but the
+ * fetch always failed on a filename mismatch and fell back to this same synth
+ * cue — so playing it directly preserves parity while dropping the dead path.)
  */
-export async function playStart(
+export function playStart(
   e: AudioContext,
   t: number,
   variant: SeVariant = 'F',
-): Promise<void> {
-  try {
-    const buf = await (await fetch('./assets/submit-button-click2.mp3')).arrayBuffer();
-    const decoded = await e.decodeAudioData(buf);
-    const src = e.createBufferSource();
-    const gain = e.createGain();
-    gain.gain.value = t;
-    src.buffer = decoded;
-    src.connect(gain);
-    gain.connect(e.destination);
-    src.start();
-  } catch {
-    playStep(e, t, variant);
-  }
+): void {
+  playStep(e, t, variant);
 }
