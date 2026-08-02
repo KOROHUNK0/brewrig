@@ -11,7 +11,7 @@
 | 型チェックのみ | `npm run typecheck` |
 | 本番ビルドのプレビュー | `npm run preview` |
 
-自動テストはなし。`scripts/audit-*.mjs` / `scripts/test-*.mjs` は Playwright を使う**手動 audit スクリプト**で、`backup/` 内のオリジナルビルドと現行 `dist/` を URL 引数で比較するために実行する (CI からは呼ばれない)。
+自動テストはなし。CI ゲートは `npm run build` (= `tsc -b && vite build`) のみ。`backup/` にはポート前のオリジナル旧バンドルが原本として残っている (gitignore 済み) が、これと `dist/` を比較していた手動 audit スクリプト群 (`scripts/`) は撤去済みで、現在は未使用のアーカイブ。
 
 ## ビルドの非自明な仕様
 
