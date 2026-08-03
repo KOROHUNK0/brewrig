@@ -84,6 +84,13 @@ export function App() {
   const tickRef = useRef<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const firedRef = useRef<Set<number>>(new Set());
+  // Wall-clock anchor. currentTime is derived as
+  //   anchorSec + floor((performance.now() - anchorPerf) / 1000)
+  // and re-anchored on every (re)start, resume, jump, and reset. This makes the
+  // timer track real elapsed time instead of counting setInterval ticks, which
+  // browsers throttle (or freeze) when the tab is backgrounded.
+  const anchorPerfRef = useRef(0);
+  const anchorSecRef = useRef(0);
 
   // Persist
   useEffect(() => {
@@ -118,16 +125,24 @@ export function App() {
     [powder, recipe],
   );
 
-  // Tick
+  // Tick — derive currentTime from the wall-clock anchor so throttled/background
+  // intervals never make the timer fall behind real time. Polls at 250ms for
+  // snappy correction; setCurrentTime bails out when the whole-second value is
+  // unchanged, so this still re-renders about once per second.
   useEffect(() => {
-    if (isPlaying) {
-      tickRef.current = window.setInterval(() => {
-        setCurrentTime((e) => e + 1);
-      }, 1000);
-    } else if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
+    if (!isPlaying) {
+      if (tickRef.current) {
+        clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+      return;
     }
+    tickRef.current = window.setInterval(() => {
+      const target =
+        anchorSecRef.current +
+        Math.floor((performance.now() - anchorPerfRef.current) / 1000);
+      setCurrentTime((prev) => (target > prev ? target : prev));
+    }, 250);
     return () => {
       if (tickRef.current) {
         clearInterval(tickRef.current);
@@ -140,31 +155,48 @@ export function App() {
   const ttsActive = soundEnabled && soundMode === 'tts' && ttsSupported;
   const ttsVolume = seVolumeMax > 0 ? Math.min(1, seVolume / seVolumeMax) : 0;
 
-  // Step firing
+  // Step firing. Uses `<= currentTime` (not `===`) so a wall-clock catch-up that
+  // skips several seconds still resolves correctly. A normal 1s tick advances
+  // one boundary at a time, so `passed` holds exactly one step and this fires
+  // identically to before. On a multi-second catch-up (P1) every passed step is
+  // marked done but only the latest is announced (SE/TTS) — the intermediate,
+  // already-late cues are suppressed rather than replayed as a burst. The finish
+  // cue always fires when 210s is crossed.
   useEffect(() => {
     if (!isPlaying) return;
+    const passed: number[] = [];
     steps.forEach((step, i) => {
-      if (currentTime === step.timeSeconds && !firedRef.current.has(i)) {
-        firedRef.current.add(i);
-        setActiveStep(i);
-        setHighlightStep(i);
+      if (step.timeSeconds <= currentTime && !firedRef.current.has(i)) {
+        passed.push(i);
+      }
+    });
+    if (passed.length > 0) {
+      passed.forEach((i) => firedRef.current.add(i));
+      // Announce only the latest passed step (index order == time order). Skip
+      // while at/after finish so a jump past the whole brew rings only the
+      // finish cue, not a stale step cue.
+      if (currentTime < FINISH_TIME) {
+        const idx = passed[passed.length - 1];
+        const step = steps[idx];
+        setActiveStep(idx);
+        setHighlightStep(idx);
         if (seActive) playStep(getAudioContext(), seVolume);
         if (ttsActive) {
           const cumulative = steps
-            .slice(0, i + 1)
+            .slice(0, idx + 1)
             .reduce((a, x) => a + x.amount, 0);
-          speak(buildStepTts(step, i, cumulative, t, lang), {
+          speak(buildStepTts(step, idx, cumulative, t, lang), {
             lang,
             volume: ttsVolume,
           });
         }
         window.setTimeout(() => setHighlightStep(null), 2000);
       }
-    });
-    if (currentTime === FINISH_TIME + 60 && finished) {
+    }
+    if (currentTime >= FINISH_TIME + 60 && finished) {
       setIsPlaying(false);
     }
-    if (currentTime === FINISH_TIME && !firedRef.current.has(FINISH_SENTINEL)) {
+    if (currentTime >= FINISH_TIME && !firedRef.current.has(FINISH_SENTINEL)) {
       firedRef.current.add(FINISH_SENTINEL);
       setFinished(true);
       setActiveStep(null);
@@ -199,7 +231,14 @@ export function App() {
   // Theme attr on body? The bundle uses `data-theme` on the .app div itself.
   // No extra effect needed; we set it via attribute.
 
+  // Re-anchor the wall-clock so currentTime resumes counting from `sec`.
+  const reanchor = useCallback((sec: number) => {
+    anchorPerfRef.current = performance.now();
+    anchorSecRef.current = sec;
+  }, []);
+
   const reset = useCallback(() => {
+    reanchor(0);
     setIsPlaying(false);
     setCurrentTime(0);
     setActiveStep(0);
@@ -207,7 +246,7 @@ export function App() {
     setFinished(false);
     firedRef.current = new Set();
     cancelSpeech();
-  }, []);
+  }, [reanchor]);
 
   const guardChange = useCallback(
     (fn: () => void) => {
@@ -254,6 +293,7 @@ export function App() {
       }
       window.setTimeout(() => setHighlightStep(null), 2000);
     }
+    reanchor(currentTime);
     setIsPlaying(true);
   }
 
@@ -287,6 +327,7 @@ export function App() {
     if (e >= FINISH_TIME) newSet.add(FINISH_SENTINEL);
     firedRef.current = newSet;
     setCurrentTime(e);
+    reanchor(e);
     setActiveStep(last);
     setHighlightStep(null);
     setFinished(false);
@@ -330,6 +371,7 @@ export function App() {
         steps.forEach((_st, i) => newSet.add(i));
         firedRef.current = newSet;
         setCurrentTime(FINISH_TIME - 1);
+        reanchor(FINISH_TIME - 1);
         setActiveStep(null);
         setHighlightStep(null);
         setFinished(false);
