@@ -12,7 +12,7 @@ BrewRig は **コーヒードリップの湯量管理タイマー** (PWA)。世�
 - **公開 URL**: `https://korohunk0.github.io/brewrig/`
 - **オフライン対応**: Service Worker によりインストール後はオフラインでも動作する PWA。
 - **自動テストなし**。CI ゲートは `npm run build`（= `tsc -b && vite build`）の型チェック + ビルド成功のみ。
-- **サーバ通信なし**。全状態はクライアント内（React state + Cookie）で完結。外部通信は Google Fonts の CSS import と、起動音 MP3 の同一オリジン fetch のみ。
+- **バックエンドなし**。全状態はクライアント内（React state + Cookie）で完結。実行時の外部通信は `index.css` にインライン化された Google Fonts の CSS `@import`（クロスオリジンのフォント取得）のみで、オフライン時はシステムフォントにフォールバック。アイコン・`manifest.json` 等のアセットは同一オリジン。起動音は合成音のため音声ファイルの取得も行わない（§7.1 / §11.4）。
 
 ### 技術スタック / コマンド
 
@@ -278,7 +278,8 @@ interface Recipe {
 
 | ref | 用途 |
 | --- | --- |
-| `tickRef` | `setInterval` の id |
+| `tickRef` | tick 用 `setInterval` の id（250ms ポーリング） |
+| `anchorPerfRef` / `anchorSecRef` | 実時計アンカー。`currentTime = anchorSec + floor((performance.now() − anchorPerf)/1000)`。(再)開始・再開・ジャンプ・リセットで `reanchor()` により貼り直す |
 | `firedRef` | 点火済みステップ index の `Set`。**完了センチネル `99`（`FINISH_SENTINEL`）** も同じ Set に入れて完了の二重発火を防ぐ |
 | `audioCtxRef` | 将来用の予約（実質未使用。AudioContext は `se.ts` が独自管理） |
 
@@ -308,24 +309,30 @@ interface Recipe {
 
 ## 6. タイマー挙動（中核ロジック）
 
-### 6.1 計時（tick）
+### 6.1 計時（tick）— 実時計基準
 
-`isPlaying` の間だけ `setInterval(1000ms)` で `currentTime` を +1。停止/アンマウントで clear。
+`currentTime` は「tick 回数のカウンタ」ではなく**実経過秒から算出**する（バックグラウンドでの `setInterval` スロットリング/凍結でタイマーが遅れないようにするため）:
+
+```
+currentTime = anchorSec + floor((performance.now() − anchorPerf) / 1000)
+```
+
+- `isPlaying` の間だけ **250ms 間隔**で再計算し、`setCurrentTime(prev => target > prev ? target : prev)` で前進（値が変わらなければ再レンダーされず、実質 1 秒に 1 回更新）。停止/アンマウントで clear。
+- **アンカー（`anchorPerf`/`anchorSec`）は `start()`（開始・再開）/ `jumpHelper` / `jumpFinish` / `reset` で `reanchor()` により貼り直す**。pause 中は tick を止めるだけで、経過時間は加算されない。
+- `performance.now()`（単調増加）を使用し、`Date.now()` は使わない（端末の時刻変更・NTP 補正の影響を避けるため）。
 
 ### 6.2 ステップ点火（`currentTime` 監視 effect）
 
 `isPlaying` 中、`currentTime` 変化のたびに:
 
-1. 各ステップ `i` について `currentTime === step.timeSeconds` かつ未点火なら:
-   - `firedRef` に `i` を追加、`activeStep=i`、`highlightStep=i`。
-   - `seActive` なら `playStep`（効果音）、`ttsActive` なら**そのステップまでの累積湯量**を読み上げる `speak(buildStepTts(...))`。
-   - 2 秒後に `highlightStep` を null に戻す（パルス演出）。
-2. `currentTime === FINISH_TIME + 60`（= **270 秒**）かつ `finished` なら **自動停止**（`setIsPlaying(false)`）。
-3. `currentTime === FINISH_TIME`（210 秒）かつセンチネル未点火なら:
-   - センチネル `99` を追加、`finished=true`、`activeStep=null`。
-   - `seActive` なら `playFinish`、`ttsActive` なら完了アナウンス。
+1. `timeSeconds <= currentTime` かつ未点火のステップを時刻順に集める（`passed`）。**通常の 1 秒進行では `passed` は 0 個か 1 個**で、旧来の `===` 判定と**同一の発火**になる。
+   - `passed` があれば全て `firedRef` に追加。**`currentTime < FINISH_TIME` のときだけ最新（＝最後）のステップを告知**: `activeStep`/`highlightStep` を更新し、`seActive` で `playStep`、`ttsActive` で累積湯量を読み上げ、2 秒後に highlight 解除。
+   - **P1 キャッチアップ**: 背景復帰などで複数秒ジャンプし `passed` が複数になった場合、通過した**中間ステップの SE/TTS は鳴らさず**、最新ステップだけを告知する（＝遅れて無意味に鳴るはずだった音を抑制）。定刻に鳴る音・完了音は失われない。
+2. `currentTime >= FINISH_TIME + 60`（= **270 秒**）かつ `finished` なら **自動停止**（`setIsPlaying(false)`）。
+3. `currentTime >= FINISH_TIME`（210 秒）かつセンチネル未点火なら: センチネル `99` を追加、`finished=true`、`activeStep=null`、`seActive` で `playFinish`、`ttsActive` で完了アナウンス。**ジャンプで 210 を跨いでも完了音は必ず 1 度鳴る**。
 
 > **重要**: 完了しても計時は止まらず、`FINISH_TIME`〜`+60秒` は**オーバータイム表示**（`+Ns`、60 秒到達で「60s over」）を続け、270 秒で自動停止する。
+> **実時計化（P1）の要点**: 前景の通常利用では発火挙動は従来と**完全に同一**。差が出るのは「タイマーが 2 秒以上遅れて追いつく」局面のみで、そこは P1 が**中間キューを抑制**する（定刻キューは抑制しない）。バックグラウンド/画面ロックで失った時間は取り戻さない（音のバースト/脱落を避けるため）。iOS ロック等は OS が JS/AudioContext ごとサスペンドするため、背景での発音自体が不可能。
 
 ### 6.3 操作関数
 
@@ -336,7 +343,7 @@ interface Recipe {
 | `requestReset()` | 常に確認ダイアログ（`confirmReset`）を開く。OK で `reset()` |
 | `reset()` | 停止・`currentTime=0`・`activeStep=0`・`finished=false`・`firedRef` を空 Set に・発話停止 |
 | `guardChange(fn)` | 計時中/進行中（`isPlaying \|\| currentTime>0`）なら確認ダイアログ（`confirmChange`）→ OK で reset してから fn 実行。アイドル時は即 fn |
-| `selectRecipe(id)` | `guardChange` 経由でレシピ変更 + 味わい・濃度を新レシピの既定へ |
+| `selectRecipe(id)` | `guardChange` 経由でレシピ変更 + 味わい・濃度を新レシピの既定へ。**粉量 `powder` は据え置き**（レシピ変更ではリセットされない） |
 
 ### 6.4 スキップ / 巻き戻し（タイムラインのタップ）
 
@@ -418,6 +425,7 @@ interface Recipe {
 | 完了 | `finished` | 「抽出完了！」バナー、タイマーはアクセント色で 210 固定表示 + オーバータイム |
 
 - 目標湯量表示: 通常は**累積湯量**（`cumulativeAtActive`）。ステップ 0 で min/max を持つ場合のみ範囲「min~max g」。`noWater` ステップは湯量非表示。
+- アイドル時（未スタート）も `activeStep=0` のため、**1投目の目標湯量が薄表示**（idle 点滅）される。表示内容は再生中と同じで、点滅スタイルのみ異なる。
 - 指示文 `ActionInstruction`: `instruction` を `" / "` で改行分割し、トークン `(透過)(浸漬)撹拌開放閉鎖` を `<strong>` で強調。
 
 ### 10.2 投入タイムライン
@@ -436,6 +444,14 @@ interface Recipe {
 - ヘッダー操作は幅 ≤560px でハンバーガーメニューに集約。
 - 幅 ≥700px でタイマーカードが横 2 カラム（タイマー | タイムライン）。
 - テーマは CSS 変数（`--bg`,`--accent` 等）を `:root` と `[data-theme=light]` で切替。基調はダーク（焙煎色）。
+- **外側クリックで閉じる**: ハンバーガーメニューは `.app` ルート要素の `onClick`（`setMenuOpen(false)`）で、レシピドロップダウンは document の `mousedown` リスナで、それぞれ外側クリック時に閉じる。
+
+### 10.5 味わいヘルプ（FlavorHelpDialog）
+
+SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 語をドメイン知識として定義する:
+
+- **明るい (bright)**: 爽やかな（スッキリとした）酸味を感じられること。
+- **甘い (sweet)**: 舌で感じる直接的な甘味ではなく、香りから感じられるもの。
 
 ---
 
@@ -452,6 +468,7 @@ interface Recipe {
 - 理由: `public/sw.js` が `./manifest.json`（root）を `ASSETS` でキャッシュしているため、`dist/assets/manifest.json` になると SW キャッシュと HTML の要求パスがズレてオフライン時に失敗する。
 - **`manifest.json` を `public/` に戻す / `assetFileNames` を一律 `assets/[name][extname]` に戻すと、このズレが再発する。**
 - ビルド時の「NOTE: asset not inlined: manifest.json」は仕様（`<link>` 経由参照のためインライン不可）。
+- 主要フィールド: `name`/`short_name` は「BrewRig」、`start_url: ./index.html`、`display: standalone`、`orientation: portrait`、`background_color`/`theme_color` = `#1a1108`、`lang: ja`、`categories: [utilities, lifestyle]`。アイコンは `icon-padding-{192,512}.png` と `icon-padding.svg`（すべて `purpose: "any maskable"`）。
 
 ### 11.3 Service Worker（`public/sw.js`）
 
@@ -467,6 +484,13 @@ interface Recipe {
 ### 11.5 静的ページ
 
 `public/credits.html` は JS バンドル対象外の独立静的ページ（アイコン素材のクレジット表記。SVG Repo「Barista Beverage Bottle」CC Attribution）。フッターの Credits リンクから開く。
+
+### 11.6 index.html（エントリ HTML）
+
+- **SW 登録**: inline script が `window` の `load` イベントで `navigator.serviceWorker.register('./sw.js')` を実行（失敗は `console.warn`）。SW 登録はここだけで、`src/` 側からは行わない。
+- **PWA / 表示メタ**: `theme-color = #1a1108`、`apple-mobile-web-app-capable = yes`、`apple-mobile-web-app-status-bar-style = black-translucent`、`apple-mobile-web-app-title = BrewRig`、`apple-touch-icon = ./assets/icon-192.png`、`<link rel="icon">` = `favicon.svg`、`<link rel="manifest" href="./manifest.json">`。
+- **OGP**: `og:title = BrewRig`、`og:description`、`og:type = website`、`og:url`（公開 URL）。`<meta name="description">` あり、ドキュメント言語は `<html lang="ja">`。
+- `<script type="module" src="/src/main.tsx">` が唯一のエントリ（ビルド時に単一 HTML へインライン化）。
 
 ---
 
@@ -520,4 +544,4 @@ interface Recipe {
 
 ---
 
-_最終更新の根拠: 本書はコミット `64d6b04`（音声ガイダンス TTS 追加）時点のソースを解析して作成。_
+_初版はコミット `64d6b04`（音声ガイダンス TTS 追加）時点で作成。以後、起動音の合成音化・手動 audit スクリプトの撤去・**タイマーの実時計化（P1 キャッチアップ）** を反映済みで、現行 `main` の実装と整合。_
