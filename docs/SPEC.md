@@ -22,7 +22,7 @@ BrewRig は **コーヒードリップの湯量管理タイマー** (PWA)。世�
 | 言語 | TypeScript 5.6（`strict: true`。ただし `noUnusedLocals`/`noUnusedParameters` は意図的に OFF） |
 | ビルド | Vite 6 + `@vitejs/plugin-react` + `vite-plugin-singlefile` |
 | 音声 | Web Audio API（効果音の合成）+ Web Speech API（音声ガイダンス） |
-| 画面 | Screen Wake Lock API（計時中のスリープ防止。非対応環境では何もしない） |
+| 画面 | Screen Wake Lock API（計時中のスリープ防止。非対応環境では何もしない）、Picture-in-Picture + Media Session API（PiP 表示・試験的） |
 | 永続化 | **Cookie**（`localStorage` は不使用） |
 | 開発サーバ | `npm run dev` |
 | 本番ビルド | `npm run build`（型チェック含む） |
@@ -51,7 +51,7 @@ App (src/App.tsx)                     … 全状態と全ビジネスロジッ�
 │   │    └─ 使用器具 / 挽き目 / 総投入湯量 / 湯温 / 備考
 │   └─ TimerCard                      (components/TimerCard.tsx)
 │        ├─ タイマー表示 + 現在の目標湯量/指示
-│        ├─ 操作ボタン (Start/Pause/Resume, Reset)
+│        ├─ 操作ボタン (Start/Pause/Resume, Reset, PiP ※対応環境のみ)
 │        ├─ サウンド設定 (ON/OFF, SE↔ガイダンス, 音量スライダー)
 │        └─ 投入タイムライン (各ステップをタップで skip/rewind)
 └─ footer (© 2025 KOROHUNK / Credits リンク → credits.html)
@@ -360,7 +360,19 @@ currentTime = anchorSec + floor((performance.now() − anchorPerf) / 1000)
 - 取得中に解放条件が成立した場合（StrictMode の effect 二重実行・素早いタブ切替）でも取り残しが出ないよう、取得完了時に破棄済みなら即 `release()` する。二重取得は取得中フラグで抑止。
 - 要セキュアコンテキスト（GitHub Pages の https / `localhost` の開発サーバは可）。
 
-### 6.6 入力ロック
+### 6.6 PiP 表示（`src/hooks/timerPip.ts`、試験的）
+
+ホーム画面や他アプリに切り替えてもタイマーを小窓で見られるようにする。主に Android Chrome を想定。
+
+- **方式**: タイマー表示を `<canvas>`（480×270）に描画し、`canvas.captureStream()` を消音の `<video>` に流して `requestPictureInPicture()` で PiP 化する（動画 PiP）。Document PiP はモバイル非対応のため不採用。
+- **表示内容**: 経過時間（完了後は `3:30 +Ns`）、状態（スタート待機中 / 一時停止中 / 現在ステップのラベル / 抽出完了）、目標湯量（`Xg まで`。ステップ 0 の min/max は範囲、`noWater` は非表示）。配色は現在のテーマに追従。表示状態が変わるたびに再描画する。
+- **操作**: PiP 小窓の再生/一時停止ボタンを Media Session の `play` / `pause` アクションハンドラで `start()` / `pause()` に割り当てる（MediaStream 映像は既定で再生/一時停止ボタンが出ないため、ハンドラ登録が必須）。`playbackState` を `isPlaying` に同期してボタン表示を切り替える。リセット・スキップは確認ダイアログを出せないため PiP からは操作不可。
+- **ライフサイクル**: TimerCard の PiP ボタン（トグル）で開閉。開く際に AudioContext も生成/再開する（PiP から初回スタートしても SE が鳴るように）。`leavepictureinpicture` でハンドラ解除・ストリーム停止・要素破棄。
+- **ハンドラ登録中の副作用**: PiP 表示中はメディアキー / Bluetooth ヘッドセットの再生・一時停止でもタイマーが操作される。
+- **対応判定**: `document.pictureInPictureEnabled` かつ `captureStream` / `requestPictureInPicture` が存在する場合のみボタンを表示。iOS（`captureStream` 非対応。ホーム画面 PWA では PiP 自体も不可）・Samsung Internet（PiP API 非対応）では表示しない。
+- **既知の制約**: ホーム画面へ戻ったときの自動 PiP 化はしない（Android の自動 PiP は全画面動画のみが対象）。先に PiP ボタンで小窓を出してから移動する。バックグラウンド中の描画更新・小窓ボタンの反応は端末依存で、実機検証が必要。
+
+### 6.7 入力ロック
 
 `SettingsCard` の `locked = isPlaying || currentTime>0`:
 - 粉量数値入力は `readOnly`/`disabled`。ロック中に入力欄をタップすると `guardChange`（リセット確認）が発火。
@@ -545,6 +557,7 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 | `src/audio/tts-phrases.ts` | ステップ→TTS 文言組み立て（値マッチ） |
 | `src/hooks/cookie.ts` | Cookie 読み書き |
 | `src/hooks/wakeLock.ts` | 計時中の画面スリープ防止（Screen Wake Lock） |
+| `src/hooks/timerPip.ts` | タイマーの PiP 表示（canvas → video PiP + Media Session、試験的） |
 | `src/utils/format.ts` | `formatTime`（mm:ss）・`isMobileUserAgent` |
 | `src/components/Header.tsx` | ヘッダー（言語/テーマ/ハンバーガー） |
 | `src/components/RecipeCard.tsx` `RecipeDropdown.tsx` `RecipeLabel.tsx` | レシピ選択 + 説明 + 出典 |

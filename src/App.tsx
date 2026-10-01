@@ -12,6 +12,7 @@ import { FINISH_TIME, getRecipeById } from './data/recipes';
 import { getStrings } from './i18n/strings';
 import { getCookie, setCookie } from './hooks/cookie';
 import { useWakeLock } from './hooks/wakeLock';
+import { useTimerPip } from './hooks/timerPip';
 import {
   ensureRunning,
   getAudioContext,
@@ -398,6 +399,49 @@ export function App() {
     });
   }
 
+  // PiP view (experimental). Mirrors what TimerCard shows: elapsed time,
+  // state label and the current cumulative target.
+  const pipStep = activeStep != null ? (steps[activeStep] ?? null) : null;
+  const pipPaused = !isPlaying && currentTime > 0 && !finished;
+  const pipOvertime = currentTime - FINISH_TIME;
+  let pipTarget = '';
+  if (!finished && pipStep && !pipStep.noWater) {
+    const amount =
+      pipStep.amountMin && pipStep.amountMax && activeStep === 0
+        ? `${pipStep.amountMin}~${pipStep.amountMax}g`
+        : `${steps.slice(0, (activeStep ?? 0) + 1).reduce((a, x) => a + x.amount, 0)}g`;
+    pipTarget = t.pipPourTo(amount);
+  }
+  const pip = useTimerPip(
+    {
+      time: finished
+        ? formatTime(FINISH_TIME) +
+          (pipOvertime > 0 ? ` +${Math.min(pipOvertime, 60)}s` : '')
+        : formatTime(currentTime),
+      status: finished
+        ? t.finishMsg
+        : pipPaused
+          ? t.pipPaused
+          : currentTime === 0 && !isPlaying
+            ? t.pipReady
+            : (pipStep?.label ?? ''),
+      target: pipTarget,
+      finished,
+      paused: pipPaused,
+      dark,
+    },
+    isPlaying,
+    start,
+    pause,
+  );
+  const togglePip = () => {
+    // Create/resume the AudioContext inside this user gesture so SE still
+    // plays when the brew is first started from the PiP window.
+    getAudioContext();
+    ensureRunning();
+    pip.toggle();
+  };
+
   const cancelConfirm = useCallback(() => {
     setConfirmState((c) => ({ ...c, open: false }));
   }, []);
@@ -480,6 +524,9 @@ export function App() {
           onReset={requestReset}
           onJump={jumpTo}
           onJumpFinish={jumpFinish}
+          pipSupported={pip.supported}
+          pipActive={pip.active}
+          onTogglePip={togglePip}
         />
       </main>
 

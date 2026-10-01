@@ -26,6 +26,9 @@ interface Props {
   onReset(): void;
   onJump(stepIdx: number): void;
   onJumpFinish(): void;
+  pipSupported: boolean;
+  pipActive: boolean;
+  onTogglePip(): void;
 }
 const STRONG_TOKENS = ['(透過)', '(浸漬)', '撹拌', '開放', '閉鎖'];
 const STRONG_REGEX = new RegExp(
@@ -71,6 +74,9 @@ export function TimerCard({
   onReset,
   onJump,
   onJumpFinish,
+  pipSupported,
+  pipActive,
+  onTogglePip,
 }: Props) {
   const s = getStrings(lang);
   const activeStep = activeIndex != null ? (steps[activeIndex] ?? null) : null;
@@ -191,6 +197,11 @@ export function TimerCard({
               >
                 {s.reset}
               </button>
+              {pipSupported && (
+                <button className="btn btn-reset btn-pip" onClick={onTogglePip}>
+                  {pipActive ? s.pipClose : s.pipOpen}
+                </button>
+              )}
             </div>
             <div className="controls-se">
               <div className="sound-row sound-row-top">
