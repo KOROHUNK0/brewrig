@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      preview_ref:
+        description: '/preview/ に併設公開するブランチ (空なら vars.PREVIEW_REF、それも空なら併設しない)'
+        required: false
+        default: ''
 
 # GitHub Pages のデプロイに必要な最小権限
 permissions:
@@ -20,9 +25,14 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    env:
+      PREVIEW_REF: ${{ inputs.preview_ref || vars.PREVIEW_REF }}
     steps:
+      # ルートは常にデフォルトブランチ (手動実行時の --ref に依らない)
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,6 +45,22 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # 試作ブランチを /preview/ に併設 (本番を差し替えずに実機確認するため)
+      - name: Checkout preview
+        if: env.PREVIEW_REF != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.PREVIEW_REF }}
+          path: preview-src
+
+      - name: Build preview
+        if: env.PREVIEW_REF != ''
+        working-directory: preview-src
+        run: |
+          npm ci
+          npm run build
+          cp -r dist ../dist/preview
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

@@ -29,6 +29,8 @@ PWA マニフェスト (`manifest.json`) は `public/` ではなく**プロジ�
 
 `main` への push で `.github/workflows/deploy.yml` が走り `dist/` を GitHub Pages にアップする。`concurrency: pages, cancel-in-progress: false` なので走行中のデプロイは中断されず順番待ち。
 
+試作ブランチは本番を差し替えずに `/brewrig/preview/` へ併設公開できる: `gh workflow run deploy.yml --ref main -f preview_ref=<branch>`。ルートは常に `main` をビルドする。`main` への push 時は `vars.PREVIEW_REF` を参照し、未設定ならプレビューは消える。詳細は `docs/SPEC.md` §12。
+
 ## ソース構成のメモ
 
 - `src/App.tsx` — タイマー本体。ステップ点火・SE 再生・確認ダイアログのフローを保持。`FINISH_TIME` は全レシピ共通 (210 秒、`src/data/recipes.ts`)。

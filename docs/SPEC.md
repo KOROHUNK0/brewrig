@@ -488,7 +488,7 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 ### 11.3 Service Worker（`public/sw.js`）
 
 - `CACHE_NAME = 'brewrig-v3'`。install で `ASSETS` を precache、activate で旧キャッシュ削除、fetch は cache-first（文書は失敗時 `./index.html` にフォールバック）。
-- **`ASSETS` に旧バンドル時代の名残**（`./app.js`, `./app.css`, `./assets/submit-button-click2.mp3`）が含まれ、singlefile 化後の実ファイル名（インライン化済み HTML / `_submit-button-click2.mp3`）と一致しない。これらは初回オンライン取得経由でキャッシュに乗る前提。触る場合は要確認。
+- **`ASSETS` に旧バンドル時代の名残**（`./app.js`, `./app.css`, `./assets/submit-button-click2.mp3`）が含まれ、singlefile 化後の実ファイル名（インライン化済み HTML / `_submit-button-click2.mp3`）と一致しない。これらは本番で 404 になるため、`cache.addAll`（1 件でも失敗すると全体が reject）が失敗し、**SW の install 自体が成功していない**（＝オフライン対応・precache は現状機能していない。2026-10 に本番 URL で確認）。触る場合は要確認。
 
 ### 11.4 起動音は合成音（外部音声ファイル非依存）
 
@@ -513,7 +513,13 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 ## 12. デプロイ（`.github/workflows/deploy.yml`）
 
 - `main` への push（または手動 `workflow_dispatch`）で発火。
-- Node 22 で `npm ci` → `npm run build` → `dist/` を `actions/upload-pages-artifact` → `actions/deploy-pages` で GitHub Pages へ。
+- Node 22 で `npm ci` → `npm run build` → `dist/` を `actions/upload-pages-artifact` → `actions/deploy-pages` で GitHub Pages へ。ルート (`/brewrig/`) は**常にデフォルトブランチ (`main`)** をビルドする（手動実行時の `--ref` に依らない）。
+- **プレビュー併設**: `PREVIEW_REF`（手動実行の入力 `preview_ref`、未指定ならリポジトリ変数 `vars.PREVIEW_REF`）が空でなければ、そのブランチを別途ビルドして `dist/preview/` に置き、`https://korohunk0.github.io/brewrig/preview/` に同時公開する。本番を差し替えずに試作ブランチを実機確認するための仕組み。
+  - 実行例: `gh workflow run deploy.yml --ref main -f preview_ref=feat/pip-timer`
+  - `main` への push 時は入力がないため `vars.PREVIEW_REF` を参照する。未設定なら次の push でプレビューは消える（Pages は毎回サイト全体を置き換えるため）。
+  - `base: './'` の相対パス設計なのでサブパスでもそのまま動く。PWA の `start_url`/scope も相対のため本番とは別アプリとしてインストールされる（名前は同じ「BrewRig」）。
+  - Cookie は `path=/` のため本番と共有される（レシピ・音量・言語・テーマ等）。
+  - SW: preview 側の `sw.js` は scope `/brewrig/preview/` で本番 (`/brewrig/`) と別登録になるが、`CACHE_NAME` が同名のため Cache Storage を共有する。現状は §11.3 の `ASSETS` 不整合で SW のインストール自体が失敗しているため実害はないが、SW を修正する際はプレビューとの干渉を考慮すること。
 - `concurrency: {group: pages, cancel-in-progress: false}` … 進行中デプロイは中断せず順番待ち。
 - 権限は最小（`contents: read`, `pages: write`, `id-token: write`）。
 
