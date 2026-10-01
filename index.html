@@ -16,6 +16,13 @@
 <meta name="apple-mobile-web-app-title" content="BrewRig">
 <link rel="apple-touch-icon" href="./assets/icon-192.png">
 <title>BrewRig</title>
+<script>
+// Apply the saved theme to <html> before first paint so body (and the area
+// shown before React mounts / on overscroll) matches. App keeps it in sync.
+if (/(?:^|; )theme=light(?:;|$)/.test(document.cookie)) {
+  document.documentElement.setAttribute('data-theme', 'light');
+}
+</script>
 </head>
 <body>
 <div id="root"></div>

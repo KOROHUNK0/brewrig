@@ -258,7 +258,7 @@ interface Recipe {
 | state | 初期値 | 説明 |
 | --- | --- | --- |
 | `lang` | Cookie or `'ja'` | 表示言語 |
-| `dark` | Cookie or `true` | テーマ（Cookie `theme` が `'light'` のときのみ false）。`.app` の `data-theme` 属性へ反映 |
+| `dark` | Cookie or `true` | テーマ（Cookie `theme` が `'light'` のときのみ false）。`.app` と `<html>` の `data-theme` 属性へ反映（§10.4） |
 | `flavorHelpOpen` | false | 味わい説明ダイアログ |
 | `recipeId` | Cookie or `'hot'` | 選択中レシピ |
 | `powder` | `20` | 粉量 g（範囲 **5〜50**、UI で clamp） |
@@ -455,6 +455,10 @@ currentTime = anchorSec + floor((performance.now() − anchorPerf) / 1000)
 - ヘッダー操作は幅 ≤560px でハンバーガーメニューに集約。
 - 幅 ≥700px でタイマーカードが横 2 カラム（タイマー | タイムライン）。
 - テーマは CSS 変数（`--bg`,`--accent` 等）を `:root` と `[data-theme=light]` で切替。基調はダーク（焙煎色）。
+- `data-theme` は `.app` と **`<html>` の両方**に付ける。`body` は `<html>` 側の変数を参照するため、`.app` だけだとライトテーマでも `body` がダークのまま残り、React マウント前の一瞬やオーバースクロール時の余白にダークが見える。
+  - 起動時: `index.html` の `<head>` 内 inline script が Cookie `theme=light` を見て、初回描画前に `<html data-theme="light">` を付ける（マウント前のダーク→ライトのちらつき防止）。
+  - 切替時: `App` の effect が `<html>` の `data-theme` を `dark`/`light` に同期する。
+- ステータスバー色（`meta theme-color` / `manifest.json` の `theme_color`）は `#1a1108` 固定でテーマに追従しない（既知の制約）。
 - **外側クリックで閉じる**: ハンバーガーメニューは `.app` ルート要素の `onClick`（`setMenuOpen(false)`）で、レシピドロップダウンは document の `mousedown` リスナで、それぞれ外側クリック時に閉じる。
 
 ### 10.5 味わいヘルプ（FlavorHelpDialog）
@@ -498,6 +502,7 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 
 ### 11.6 index.html（エントリ HTML）
 
+- **テーマの先行適用**: `<head>` 内 inline script が Cookie `theme=light` なら `<html>` に `data-theme="light"` を付ける（§10.4）。
 - **SW 登録**: inline script が `window` の `load` イベントで `navigator.serviceWorker.register('./sw.js')` を実行（失敗は `console.warn`）。SW 登録はここだけで、`src/` 側からは行わない。
 - **PWA / 表示メタ**: `theme-color = #1a1108`、`apple-mobile-web-app-capable = yes`、`apple-mobile-web-app-status-bar-style = black-translucent`、`apple-mobile-web-app-title = BrewRig`、`apple-touch-icon = ./assets/icon-192.png`、`<link rel="icon">` = `favicon.svg`、`<link rel="manifest" href="./manifest.json">`。
 - **OGP**: `og:title = BrewRig`、`og:description`、`og:type = website`、`og:url`（公開 URL）。`<meta name="description">` あり、ドキュメント言語は `<html lang="ja">`。

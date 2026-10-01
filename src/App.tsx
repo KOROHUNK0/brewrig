@@ -242,8 +242,12 @@ export function App() {
     cancelSpeech();
   }, [lang, ttsSupported]);
 
-  // Theme attr on body? The bundle uses `data-theme` on the .app div itself.
-  // No extra effect needed; we set it via attribute.
+  // The bundle sets `data-theme` on the .app div itself; mirror it onto <html>
+  // so body's background follows the theme too (initial value is applied
+  // pre-paint by the inline script in index.html).
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  }, [dark]);
 
   // Re-anchor the wall-clock so currentTime resumes counting from `sec`.
   const reanchor = useCallback((sec: number) => {
