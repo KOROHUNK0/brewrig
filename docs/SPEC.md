@@ -22,6 +22,7 @@ BrewRig は **コーヒードリップの湯量管理タイマー** (PWA)。世�
 | 言語 | TypeScript 5.6（`strict: true`。ただし `noUnusedLocals`/`noUnusedParameters` は意図的に OFF） |
 | ビルド | Vite 6 + `@vitejs/plugin-react` + `vite-plugin-singlefile` |
 | 音声 | Web Audio API（効果音の合成）+ Web Speech API（音声ガイダンス） |
+| 画面 | Screen Wake Lock API（計時中のスリープ防止。非対応環境では何もしない） |
 | 永続化 | **Cookie**（`localStorage` は不使用） |
 | 開発サーバ | `npm run dev` |
 | 本番ビルド | `npm run build`（型チェック含む） |
@@ -256,8 +257,8 @@ interface Recipe {
 
 | state | 初期値 | 説明 |
 | --- | --- | --- |
-| `lang` | `'ja'` | 表示言語。永続化しない（起動時は常に ja） |
-| `dark` | `true` | テーマ。`.app` の `data-theme` 属性へ反映。永続化しない |
+| `lang` | Cookie or `'ja'` | 表示言語 |
+| `dark` | Cookie or `true` | テーマ（Cookie `theme` が `'light'` のときのみ false）。`.app` の `data-theme` 属性へ反映 |
 | `flavorHelpOpen` | false | 味わい説明ダイアログ |
 | `recipeId` | Cookie or `'hot'` | 選択中レシピ |
 | `powder` | `20` | 粉量 g（範囲 **5〜50**、UI で clamp） |
@@ -351,7 +352,15 @@ currentTime = anchorSec + floor((performance.now() − anchorPerf) / 1000)
 - `jumpHelper(e)`: `timeSeconds <= e` の全ステップを点火済みとして `firedRef` を再構築（`e >= FINISH_TIME` ならセンチネルも追加）、`currentTime=e`・`activeStep=最後に該当した index`・`finished=false`。**`isPlaying` は変更しない**。
 - `jumpFinish()`: 確認ダイアログ（`confirmFinish`）。OK で全ステップ index を点火済みにし（**センチネルは入れない**）、`currentTime = FINISH_TIME − 1`（=209）にして 50ms 後に再生開始 → 次の tick で 210 に達し、通常のステップ点火 effect 経由で完了処理（＝完了音）が走る。
 
-### 6.5 入力ロック
+### 6.5 画面スリープ防止（`src/hooks/wakeLock.ts`）
+
+- `useWakeLock(isPlaying)`：**`isPlaying` の間だけ** Screen Wake Lock（`navigator.wakeLock.request('screen')`）を保持する。一時停止・リセット・270 秒の自動停止で `isPlaying=false` になると解放。完了後のオーバータイム（210〜270 秒）中は保持を継続。
+- ページ非表示でブラウザが自動解放するため、`visibilitychange` で可視に戻ったとき `isPlaying` なら再取得する。
+- 非対応環境（`'wakeLock' in navigator` が false）では何もしない。`request()` の失敗（省電力モード等の `NotAllowedError`）は握りつぶし、計時・音声に影響させない。
+- 取得中に解放条件が成立した場合（StrictMode の effect 二重実行・素早いタブ切替）でも取り残しが出ないよう、取得完了時に破棄済みなら即 `release()` する。二重取得は取得中フラグで抑止。
+- 要セキュアコンテキスト（GitHub Pages の https / `localhost` の開発サーバは可）。
+
+### 6.6 入力ロック
 
 `SettingsCard` の `locked = isPlaying || currentTime>0`:
 - 粉量数値入力は `readOnly`/`disabled`。ロック中に入力欄をタップすると `guardChange`（リセット確認）が発火。
@@ -397,10 +406,12 @@ currentTime = anchorSec + floor((performance.now() − anchorPerf) / 1000)
 | `seVolume` | 数値文字列 | 起動時 `parseFloat` → `[0, seVolumeMax]` に clamp。不正なら既定 |
 | `soundMode` | `'se'` / `'tts'` | `'tts'` は `ttsSupported` の場合のみ採用。旧値 `'off'` は下記参照 |
 | `soundEnabled` | `'1'` / `'0'` | ON/OFF |
+| `lang` | `'ja'` / `'en'` | 起動時に読み込み。それ以外の値・未設定は `ja` |
+| `theme` | `'dark'` / `'light'` | 起動時に読み込み。それ以外の値・未設定は `dark` |
 
 初期化の後方互換: `soundEnabled` が未設定でも旧 `soundMode==='off'` を OFF として解釈する。
 
-> `lang` と `dark`（テーマ）は永続化されない。リロードで常に ja / ダークに戻る。
+> Cookie は `path=/` のため同一オリジン（`korohunk0.github.io`）の他アプリと名前空間を共有する。`lang` / `theme` のような汎用名は衝突し得るため、読み込み時は**許可値以外を既定値に丸める**（不正値で UI を壊さない）。
 
 ---
 
@@ -528,6 +539,7 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 | `src/audio/tts.ts` | Web Speech API ラッパ |
 | `src/audio/tts-phrases.ts` | ステップ→TTS 文言組み立て（値マッチ） |
 | `src/hooks/cookie.ts` | Cookie 読み書き |
+| `src/hooks/wakeLock.ts` | 計時中の画面スリープ防止（Screen Wake Lock） |
 | `src/utils/format.ts` | `formatTime`（mm:ss）・`isMobileUserAgent` |
 | `src/components/Header.tsx` | ヘッダー（言語/テーマ/ハンバーガー） |
 | `src/components/RecipeCard.tsx` `RecipeDropdown.tsx` `RecipeLabel.tsx` | レシピ選択 + 説明 + 出典 |

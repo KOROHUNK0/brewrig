@@ -11,6 +11,7 @@ import type {
 import { FINISH_TIME, getRecipeById } from './data/recipes';
 import { getStrings } from './i18n/strings';
 import { getCookie, setCookie } from './hooks/cookie';
+import { useWakeLock } from './hooks/wakeLock';
 import {
   ensureRunning,
   getAudioContext,
@@ -56,10 +57,14 @@ export function App() {
     if (cookieSoundModeRaw === 'se') return 'se';
     return 'se';
   })();
+  // Cookies are shared with other apps on the same origin (path=/), so accept
+  // only known values and fall back to the defaults otherwise.
+  const initialLang: Lang = getCookie('lang') === 'en' ? 'en' : 'ja';
+  const initialDark = getCookie('theme') !== 'light';
 
   // State
-  const [lang, setLang] = useState<Lang>('ja');
-  const [dark, setDark] = useState(true);
+  const [lang, setLang] = useState<Lang>(initialLang);
+  const [dark, setDark] = useState(initialDark);
   const [flavorHelpOpen, setFlavorHelpOpen] = useState(false);
   const [recipeId, setRecipeId] = useState<RecipeId>(cookieRecipeId);
   const [powder, setPowder] = useState(20);
@@ -105,6 +110,15 @@ export function App() {
   useEffect(() => {
     setCookie('soundEnabled', soundEnabled ? '1' : '0');
   }, [soundEnabled]);
+  useEffect(() => {
+    setCookie('lang', lang);
+  }, [lang]);
+  useEffect(() => {
+    setCookie('theme', dark ? 'dark' : 'light');
+  }, [dark]);
+
+  // Keep the screen on while the timer runs.
+  useWakeLock(isPlaying);
 
   const t = getStrings(lang);
   const recipe = useMemo(() => getRecipeById(recipeId), [recipeId]);
