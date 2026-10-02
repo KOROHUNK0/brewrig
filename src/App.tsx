@@ -414,10 +414,12 @@ export function App() {
   }
   const pip = useTimerPip(
     {
-      time: finished
-        ? formatTime(FINISH_TIME) +
-          (pipOvertime > 0 ? ` +${Math.min(pipOvertime, 60)}s` : '')
-        : formatTime(currentTime),
+      time: finished ? formatTime(FINISH_TIME) : formatTime(currentTime),
+      // Same notation as TimerCard's overtime display.
+      overtime:
+        finished && pipOvertime > 0
+          ? `+${Math.min(pipOvertime, 60)}${pipOvertime >= 60 ? 's over' : 's'}`
+          : '',
       status: finished
         ? t.finishMsg
         : pipPaused

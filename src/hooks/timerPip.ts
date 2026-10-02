@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface PipView {
   time: string;
+  overtime: string;
   status: string;
   target: string;
   finished: boolean;
@@ -48,7 +49,14 @@ function draw(canvas: HTMLCanvasElement, v: PipView): void {
 
   g.fillStyle = v.finished ? c.accent : v.paused ? c.muted : c.text;
   g.font = '500 96px "DM Mono", monospace';
-  g.fillText(v.time, W / 2, 140);
+  g.fillText(v.time, W / 2, v.overtime ? 128 : 140);
+
+  // Overtime sits small under the time (only after finish, when no target).
+  if (v.overtime) {
+    g.fillStyle = c.muted;
+    g.font = '500 30px "DM Mono", monospace';
+    g.fillText(v.overtime, W / 2, 205);
+  }
 
   if (v.target) {
     g.fillStyle = c.accent;
@@ -171,6 +179,7 @@ export function useTimerPip(
     active,
     isPlaying,
     view.time,
+    view.overtime,
     view.status,
     view.target,
     view.finished,
