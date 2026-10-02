@@ -134,10 +134,8 @@ export function TimerCard({
               </span>
               {finished && currentTime > FINISH_TIME && (
                 <span className="overtime-display">
-                  <span className="overtime-label">+</span>
                   <span className="overtime-value">
-                    {String(Math.min(overtime, 60))}
-                    {overtime >= 60 ? 's over' : 's'}
+                    {s.overtime(Math.min(overtime, 60))}
                   </span>
                 </span>
               )}

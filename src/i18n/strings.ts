@@ -35,6 +35,7 @@ export interface Strings {
   pipPaused: string;
   pipReady: string;
   pipPourTo: (amount: string) => string;
+  overtime: (sec: number) => string;
   seOn: string;
   seOff: string;
   timelineTitle: string;
@@ -145,6 +146,7 @@ const ja: Strings = {
   pipPaused: '一時停止中',
   pipReady: 'スタート待機中',
   pipPourTo: (amount) => `${amount} まで`,
+  overtime: (sec) => `${sec >= 60 ? '60s+' : `${sec}s`}:超過`,
   seOn: '🔔 SE: ON',
   seOff: '🔇 SE: OFF',
   timelineTitle: '投入タイムライン',
@@ -267,6 +269,7 @@ const en: Strings = {
   pipPaused: 'Paused',
   pipReady: 'Ready',
   pipPourTo: (amount) => `up to ${amount}`,
+  overtime: (sec) => `${sec >= 60 ? '60s+' : `${sec}s`}:over`,
   seOn: '🔔 SE: ON',
   seOff: '🔇 SE: OFF',
   timelineTitle: 'Pour Timeline',

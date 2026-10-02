@@ -54,7 +54,8 @@ function draw(canvas: HTMLCanvasElement, v: PipView): void {
   // Overtime sits small under the time (only after finish, when no target).
   if (v.overtime) {
     g.fillStyle = c.muted;
-    g.font = '500 30px "DM Mono", monospace';
+    // "超過" has no DM Mono glyphs; fall back to the app's JP font.
+    g.font = '500 30px "DM Mono", "Noto Sans JP", monospace';
     g.fillText(v.overtime, W / 2, 205);
   }
 

@@ -417,9 +417,7 @@ export function App() {
       time: finished ? formatTime(FINISH_TIME) : formatTime(currentTime),
       // Same notation as TimerCard's overtime display.
       overtime:
-        finished && pipOvertime > 0
-          ? `+${Math.min(pipOvertime, 60)}${pipOvertime >= 60 ? 's over' : 's'}`
-          : '',
+        finished && pipOvertime > 0 ? t.overtime(Math.min(pipOvertime, 60)) : '',
       status: finished
         ? t.finishMsg
         : pipPaused
