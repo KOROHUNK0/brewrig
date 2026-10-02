@@ -26,6 +26,9 @@ interface Props {
   onReset(): void;
   onJump(stepIdx: number): void;
   onJumpFinish(): void;
+  pipSupported: boolean;
+  pipActive: boolean;
+  onTogglePip(): void;
 }
 const STRONG_TOKENS = ['(透過)', '(浸漬)', '撹拌', '開放', '閉鎖'];
 const STRONG_REGEX = new RegExp(
@@ -71,6 +74,9 @@ export function TimerCard({
   onReset,
   onJump,
   onJumpFinish,
+  pipSupported,
+  pipActive,
+  onTogglePip,
 }: Props) {
   const s = getStrings(lang);
   const activeStep = activeIndex != null ? (steps[activeIndex] ?? null) : null;
@@ -104,6 +110,21 @@ export function TimerCard({
     <section className={`card timer-card ${pulse ? 'pulse' : ''}`}>
       <div className="timer-card-inner">
         <div className="timer-panel">
+          {pipSupported && (
+            <button
+              type="button"
+              className={`pip-toggle ${pipActive ? 'active' : ''}`}
+              onClick={onTogglePip}
+              aria-label={pipActive ? s.pipClose : s.pipOpen}
+              aria-pressed={pipActive}
+              title={pipActive ? s.pipClose : s.pipOpen}
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <rect x="2.5" y="4.5" width="19" height="15" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                <rect x="12" y="11.5" width="7" height="5.5" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+          )}
           <div
             className={`timer-display ${finished ? 'finished' : ''} ${paused ? 'paused' : ''} ${idleClass ? 'idle' : ''}`.replace(/\s+/g, ' ')}
           >

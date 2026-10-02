@@ -37,7 +37,7 @@ PWA マニフェスト (`manifest.json`) は `public/` ではなく**プロジ�
 - `src/audio/se.ts` — オリジナルバンドルからの**直訳ポート**。変数名 (`e`, `t`, `w`, `T`, `it`, `ot` など)、バリアント A〜G / D2〜D6 の構造は意図的に保存している。可読性目的のリネームはパリティを壊すので原則しない。
 - `src/data/recipes.ts` — 4:6 メソッド (Tetsu Kasuya) ベースのレシピ定義。`Recipe` インターフェースは `src/types/index.ts`。
 - `src/i18n/strings.ts` — ja/en の文言。`Lang` 型は `'ja' | 'en'`。
-- `src/hooks/cookie.ts` — 永続化は `localStorage` ではなく **Cookie** (`recipeId`, `seVolume`)。SameSite=Lax / 365 日。
+- `src/hooks/cookie.ts` — 永続化は `localStorage` ではなく **Cookie** (`recipeId`, `seVolume`, `soundMode`, `soundEnabled`, `lang`, `theme`)。SameSite=Lax / 365 日。`path=/` で同一オリジンの他アプリと共有されるため、読み込み時は許可値以外を既定値に丸める。
 - `src/components/` — 単機能カード単位 (`RecipeCard` / `SettingsCard` / `TimerCard` / `Header` / `Dialogs` / `SegSlider` 等)。
 - `manifest.json` — PWA マニフェスト。プロジェクト直下に置く (理由は「ビルドの非自明な仕様」参照)。
 - `public/sw.js` — Service Worker。`./manifest.json` は `assetFileNames` の root 配置と整合しているが、`ASSETS` リスト内の `./app.js` / `./app.css` / `./assets/submit-button-click2.mp3` は旧バンドル時代の名残で実ファイル名 (singlefile 化済み HTML / `_submit-button-click2.mp3`) と一致しない。これらは初回オンライン取得経由でキャッシュに乗る前提。触る場合は要確認。

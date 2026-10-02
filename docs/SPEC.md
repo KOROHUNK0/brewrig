@@ -22,7 +22,7 @@ BrewRig は **コーヒードリップの湯量管理タイマー** (PWA)。世�
 | 言語 | TypeScript 5.6（`strict: true`。ただし `noUnusedLocals`/`noUnusedParameters` は意図的に OFF） |
 | ビルド | Vite 6 + `@vitejs/plugin-react` + `vite-plugin-singlefile` |
 | 音声 | Web Audio API（効果音の合成）+ Web Speech API（音声ガイダンス） |
-| 画面 | Screen Wake Lock API（計時中のスリープ防止。非対応環境では何もしない） |
+| 画面 | Screen Wake Lock API（計時中のスリープ防止。非対応環境では何もしない）、Picture-in-Picture + Media Session API（PiP 表示・試験的） |
 | 永続化 | **Cookie**（`localStorage` は不使用） |
 | 開発サーバ | `npm run dev` |
 | 本番ビルド | `npm run build`（型チェック含む） |
@@ -51,6 +51,7 @@ App (src/App.tsx)                     … 全状態と全ビジネスロジッ�
 │   │    └─ 使用器具 / 挽き目 / 総投入湯量 / 湯温 / 備考
 │   └─ TimerCard                      (components/TimerCard.tsx)
 │        ├─ タイマー表示 + 現在の目標湯量/指示
+│        ├─ PiP アイコン (タイマー表示ブロック右上。対応環境のみ)
 │        ├─ 操作ボタン (Start/Pause/Resume, Reset)
 │        ├─ サウンド設定 (ON/OFF, SE↔ガイダンス, 音量スライダー)
 │        └─ 投入タイムライン (各ステップをタップで skip/rewind)
@@ -360,7 +361,19 @@ currentTime = anchorSec + floor((performance.now() − anchorPerf) / 1000)
 - 取得中に解放条件が成立した場合（StrictMode の effect 二重実行・素早いタブ切替）でも取り残しが出ないよう、取得完了時に破棄済みなら即 `release()` する。二重取得は取得中フラグで抑止。
 - 要セキュアコンテキスト（GitHub Pages の https / `localhost` の開発サーバは可）。
 
-### 6.6 入力ロック
+### 6.6 PiP 表示（`src/hooks/timerPip.ts`、試験的）
+
+ホーム画面や他アプリに切り替えてもタイマーを小窓で見られるようにする。主に Android Chrome を想定。
+
+- **方式**: タイマー表示を `<canvas>`（480×270）に描画し、`canvas.captureStream()` を消音の `<video>` に流して `requestPictureInPicture()` で PiP 化する（動画 PiP）。Document PiP はモバイル非対応のため不採用。
+- **表示内容**: 経過時間（完了後は `3:30` 固定）、オーバータイム（完了後のみ、時間表示の下に小さく `+Ns`。60 秒以上は `+60s over`。アプリ本体の表記と同じ）、状態（スタート待機中 / 一時停止中 / 現在ステップのラベル / 抽出完了）、目標湯量（`Xg まで`。ステップ 0 の min/max は範囲、`noWater` は非表示）。配色は現在のテーマに追従。表示状態が変わるたびに再描画する（video が再生中のときのみ新フレームが小窓に届く）。
+- **操作**: PiP 小窓の再生/一時停止ボタンを Media Session の `play` / `pause` アクションハンドラで `start()` / `pause()` に割り当てる（MediaStream 映像は既定で再生/一時停止ボタンが出ないため、ハンドラ登録が必須）。**`<video>` の再生/一時停止を `isPlaying` に同期**してボタン表示（⏸/▶）を切り替える。Media Session 仕様上、実効の再生状態は「宣言 `playbackState` が playing か、または再生中のメディア要素がある」と playing になるため、`playbackState='paused'` を宣言しても video が再生中だとボタンが ⏸ のまま残り、`play`（再開）が呼ばれない。停止時は「一時停止中」等の最終フレームを描画してからストリームに乗る猶予（約 200ms）を置いて video を pause する。停止中に表示内容が変わった場合（テーマ切替等）は、一瞬 play して再描画を反映してから再度 pause する。`playbackState` も補助的に同期する。リセット・スキップは確認ダイアログを出せないため PiP からは操作不可。
+- **ライフサイクル**: タイマー表示ブロック（`.timer-panel`）右上の PiP アイコン（2 カラム表示でもタイムライン側ではなくタイマー側の右上。トグル。表示中はアクセント色の枠でアクティブ表示、`aria-pressed` 連動）で開閉。開く際に AudioContext も生成/再開する（PiP から初回スタートしても SE が鳴るように）。`leavepictureinpicture` でハンドラ解除・ストリーム停止・要素破棄。
+- **ハンドラ登録中の副作用**: PiP 表示中はメディアキー / Bluetooth ヘッドセットの再生・一時停止でもタイマーが操作される。
+- **対応判定**: `document.pictureInPictureEnabled` かつ `captureStream` / `requestPictureInPicture` が存在する場合のみアイコンを表示。iOS（`captureStream` 非対応。ホーム画面 PWA では PiP 自体も不可）・Samsung Internet（PiP API 非対応）では表示しない。
+- **既知の制約**: ホーム画面へ戻ったときの自動 PiP 化はしない（Android の自動 PiP は全画面動画のみが対象）。先に PiP アイコンで小窓を出してから移動する。バックグラウンド中の描画更新・小窓ボタンの反応は端末依存で、実機検証が必要。
+
+### 6.7 入力ロック
 
 `SettingsCard` の `locked = isPlaying || currentTime>0`:
 - 粉量数値入力は `readOnly`/`disabled`。ロック中に入力欄をタップすると `guardChange`（リセット確認）が発火。
@@ -551,6 +564,7 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 | `src/audio/tts-phrases.ts` | ステップ→TTS 文言組み立て（値マッチ） |
 | `src/hooks/cookie.ts` | Cookie 読み書き |
 | `src/hooks/wakeLock.ts` | 計時中の画面スリープ防止（Screen Wake Lock） |
+| `src/hooks/timerPip.ts` | タイマーの PiP 表示（canvas → video PiP + Media Session、試験的） |
 | `src/utils/format.ts` | `formatTime`（mm:ss）・`isMobileUserAgent` |
 | `src/components/Header.tsx` | ヘッダー（言語/テーマ/ハンバーガー） |
 | `src/components/RecipeCard.tsx` `RecipeDropdown.tsx` `RecipeLabel.tsx` | レシピ選択 + 説明 + 出典 |
@@ -567,4 +581,4 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 
 ---
 
-_初版はコミット `64d6b04`（音声ガイダンス TTS 追加）時点で作成。以後、起動音の合成音化・手動 audit スクリプトの撤去・**タイマーの実時計化（P1 キャッチアップ）** を反映済みで、現行 `main` の実装と整合。_
+_初版はコミット `64d6b04`（音声ガイダンス TTS 追加）時点で作成。以後、起動音の合成音化・手動 audit スクリプトの撤去・**タイマーの実時計化（P1 キャッチアップ）**・画面スリープ防止・言語/テーマの Cookie 保存・`<html>` へのテーマ先行適用を反映済み。`feat/pip-timer` ブランチでは **PiP 表示（試験的、§6.6）** も反映。_

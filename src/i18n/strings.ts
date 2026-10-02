@@ -30,6 +30,11 @@ export interface Strings {
   resume: string;
   pause: string;
   reset: string;
+  pipOpen: string;
+  pipClose: string;
+  pipPaused: string;
+  pipReady: string;
+  pipPourTo: (amount: string) => string;
   seOn: string;
   seOff: string;
   timelineTitle: string;
@@ -135,6 +140,11 @@ const ja: Strings = {
   resume: '再開',
   pause: '一時停止',
   reset: 'リセット',
+  pipOpen: 'PiP で表示',
+  pipClose: 'PiP を閉じる',
+  pipPaused: '一時停止中',
+  pipReady: 'スタート待機中',
+  pipPourTo: (amount) => `${amount} まで`,
   seOn: '🔔 SE: ON',
   seOff: '🔇 SE: OFF',
   timelineTitle: '投入タイムライン',
@@ -252,6 +262,11 @@ const en: Strings = {
   resume: 'Resume',
   pause: 'Pause',
   reset: 'Reset',
+  pipOpen: 'Open picture-in-picture',
+  pipClose: 'Close picture-in-picture',
+  pipPaused: 'Paused',
+  pipReady: 'Ready',
+  pipPourTo: (amount) => `up to ${amount}`,
   seOn: '🔔 SE: ON',
   seOff: '🔇 SE: OFF',
   timelineTitle: 'Pour Timeline',
