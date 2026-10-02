@@ -365,8 +365,8 @@ currentTime = anchorSec + floor((performance.now() − anchorPerf) / 1000)
 ホーム画面や他アプリに切り替えてもタイマーを小窓で見られるようにする。主に Android Chrome を想定。
 
 - **方式**: タイマー表示を `<canvas>`（480×270）に描画し、`canvas.captureStream()` を消音の `<video>` に流して `requestPictureInPicture()` で PiP 化する（動画 PiP）。Document PiP はモバイル非対応のため不採用。
-- **表示内容**: 経過時間（完了後は `3:30 +Ns`）、状態（スタート待機中 / 一時停止中 / 現在ステップのラベル / 抽出完了）、目標湯量（`Xg まで`。ステップ 0 の min/max は範囲、`noWater` は非表示）。配色は現在のテーマに追従。表示状態が変わるたびに再描画する。
-- **操作**: PiP 小窓の再生/一時停止ボタンを Media Session の `play` / `pause` アクションハンドラで `start()` / `pause()` に割り当てる（MediaStream 映像は既定で再生/一時停止ボタンが出ないため、ハンドラ登録が必須）。`playbackState` を `isPlaying` に同期してボタン表示を切り替える。リセット・スキップは確認ダイアログを出せないため PiP からは操作不可。
+- **表示内容**: 経過時間（完了後は `3:30 +Ns`）、状態（スタート待機中 / 一時停止中 / 現在ステップのラベル / 抽出完了）、目標湯量（`Xg まで`。ステップ 0 の min/max は範囲、`noWater` は非表示）。配色は現在のテーマに追従。表示状態が変わるたびに再描画する（video が再生中のときのみ新フレームが小窓に届く）。
+- **操作**: PiP 小窓の再生/一時停止ボタンを Media Session の `play` / `pause` アクションハンドラで `start()` / `pause()` に割り当てる（MediaStream 映像は既定で再生/一時停止ボタンが出ないため、ハンドラ登録が必須）。**`<video>` の再生/一時停止を `isPlaying` に同期**してボタン表示（⏸/▶）を切り替える。Media Session 仕様上、実効の再生状態は「宣言 `playbackState` が playing か、または再生中のメディア要素がある」と playing になるため、`playbackState='paused'` を宣言しても video が再生中だとボタンが ⏸ のまま残り、`play`（再開）が呼ばれない。停止時は「一時停止中」等の最終フレームを描画してからストリームに乗る猶予（約 200ms）を置いて video を pause する。停止中に表示内容が変わった場合（テーマ切替等）は、一瞬 play して再描画を反映してから再度 pause する。`playbackState` も補助的に同期する。リセット・スキップは確認ダイアログを出せないため PiP からは操作不可。
 - **ライフサイクル**: TimerCard の PiP ボタン（トグル）で開閉。開く際に AudioContext も生成/再開する（PiP から初回スタートしても SE が鳴るように）。`leavepictureinpicture` でハンドラ解除・ストリーム停止・要素破棄。
 - **ハンドラ登録中の副作用**: PiP 表示中はメディアキー / Bluetooth ヘッドセットの再生・一時停止でもタイマーが操作される。
 - **対応判定**: `document.pictureInPictureEnabled` かつ `captureStream` / `requestPictureInPicture` が存在する場合のみボタンを表示。iOS（`captureStream` 非対応。ホーム画面 PWA では PiP 自体も不可）・Samsung Internet（PiP API 非対応）では表示しない。

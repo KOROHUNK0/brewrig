@@ -149,15 +149,27 @@ export function useTimerPip(
     }
   }, [open]);
 
-  // Redraw whenever the displayed state changes; keep the video playing so
-  // new frames reach the PiP window.
+  // Redraw whenever the displayed state changes, and mirror isPlaying onto the
+  // <video> itself. The PiP play/pause button follows the *actual* playback
+  // state, which stays "playing" while any media element plays regardless of
+  // the declared playbackState — so an always-playing video leaves the button
+  // stuck on pause and the "play" action never fires. While stopped, the video
+  // plays just long enough for the new frame to reach the stream, then pauses.
   useEffect(() => {
     if (!active || !canvasRef.current) return;
     draw(canvasRef.current, view);
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
     const video = videoRef.current;
-    if (video?.paused) video.play().catch(() => {});
+    if (!video) return;
+    if (video.paused) video.play().catch(() => {});
+    if (isPlaying) return;
+    const id = window.setTimeout(() => video.pause(), 200);
+    return () => clearTimeout(id);
   }, [
     active,
+    isPlaying,
     view.time,
     view.status,
     view.target,
@@ -165,11 +177,6 @@ export function useTimerPip(
     view.paused,
     view.dark,
   ]);
-
-  useEffect(() => {
-    if (!active || !('mediaSession' in navigator)) return;
-    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-  }, [active, isPlaying]);
 
   // Close PiP on unmount.
   useEffect(
