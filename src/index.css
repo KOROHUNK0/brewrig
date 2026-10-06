@@ -59,3 +59,7 @@
 @media (width>=700px){.pip-toggle{top:-1rem;right:.6rem}}
 .pip-toggle:hover{color:var(--accent2);background:var(--surface2)}
 .pip-toggle.active{color:var(--accent);border-color:var(--accent)}
+.update-toast{z-index:90;color:var(--text-primary);background:var(--surface);border:1px solid var(--accent);border-radius:12px;align-items:center;gap:.6rem;width:max-content;max-width:calc(100% - 32px);padding:.55rem .6rem .55rem 1rem;font-size:.85rem;display:flex;position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translate(-50%);box-shadow:0 6px 24px #0006}
+.update-toast-msg{flex:1}
+.update-toast-reload{white-space:nowrap;padding:.4rem .8rem;font-size:.8rem}
+.update-toast-close{color:var(--text-dim);cursor:pointer;background:0 0;border:0;padding:0 .3rem;font-size:1.2rem;line-height:1}

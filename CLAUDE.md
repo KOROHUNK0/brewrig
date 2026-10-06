@@ -40,7 +40,7 @@ PWA マニフェスト (`manifest.json`) は `public/` ではなく**プロジ�
 - `src/hooks/cookie.ts` — 永続化は `localStorage` ではなく **Cookie** (`recipeId`, `seVolume`, `soundMode`, `soundEnabled`, `lang`, `theme`)。SameSite=Lax / 365 日。`path=/` で同一オリジンの他アプリと共有されるため、読み込み時は許可値以外を既定値に丸める。
 - `src/components/` — 単機能カード単位 (`RecipeCard` / `SettingsCard` / `TimerCard` / `Header` / `Dialogs` / `SegSlider` 等)。
 - `manifest.json` — PWA マニフェスト。プロジェクト直下に置く (理由は「ビルドの非自明な仕様」参照)。
-- `public/sw.js` — Service Worker。`./manifest.json` は `assetFileNames` の root 配置と整合しているが、`ASSETS` リスト内の `./app.js` / `./app.css` / `./assets/submit-button-click2.mp3` は旧バンドル時代の名残で実ファイル名 (singlefile 化済み HTML / `_submit-button-click2.mp3`) と一致しない。これらは初回オンライン取得経由でキャッシュに乗る前提。触る場合は要確認。
+- `public/sw.js` — Service Worker。HTML は network-first、他の同一オリジン資産は cache-first。`ASSETS` には **dist に実在するファイルだけ**を並べる (1 件でも 404 だと `cache.addAll` が失敗し install 全体が失敗する。2026-10 まで旧バンドルの名残でこの状態だった)。キャッシュ名は `brewrig:<scope>:<BUILD_ID>` で、`__BUILD_ID__` は `vite.config.ts` の `swBuildId` プラグインがビルド時に埋め込む。登録は `src/hooks/swUpdate.ts` から本番ビルドのみ。詳細は `docs/SPEC.md` §11.3 / §11.7。
 - `public/credits.html` — JS バンドル対象外の静的ページ。
 
 ## TypeScript
@@ -50,6 +50,6 @@ PWA マニフェスト (`manifest.json`) は `public/` ではなく**プロジ�
 ## 編集時の注意
 
 - バックアップとのパリティ目的で残している命名・構造には手を加えない (前述の `src/audio/se.ts`)。
-- 単一 HTML 出力前提のため、追加アセットを `public/` に置く際は SW のキャッシュリストと整合性を確認する。
+- 単一 HTML 出力前提のため、追加アセットを `public/` に置く・消す際は SW の `ASSETS` リストを同期する (存在しないファイルを含めると SW の install が失敗する)。
 - `manifest.json` を `public/` に戻したり、`assetFileNames` の関数を一律 `'assets/[name][extname]'` に戻したりすると、SW キャッシュと HTML 要求パスのズレが再発する。変更する場合は両者の同期を保つこと。
 - レシピの全所要時間は `FINISH_TIME` に揃える。これを変えると `App.tsx` の終了センチネル (`FINISH_SENTINEL = 99`) ロジックと SE 発火タイミングに波及する。

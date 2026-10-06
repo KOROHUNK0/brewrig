@@ -10,7 +10,7 @@ BrewRig は **コーヒードリップの湯量管理タイマー** (PWA)。世�
 
 - **形態**: React 19 + TypeScript 製 SPA を **単一ファイル HTML** にバンドルし、GitHub Pages に配信。
 - **公開 URL**: `https://korohunk0.github.io/brewrig/`
-- **オフライン対応**: Service Worker によりインストール後はオフラインでも動作する PWA。
+- **オフライン対応**: Service Worker により、一度オンラインで開いた後はオフラインでも動作する PWA（§11.3）。新バージョンのデプロイ後は画面下のトーストで再読み込みを促す（§11.7）。
 - **自動テストなし**。CI ゲートは `npm run build`（= `tsc -b && vite build`）の型チェック + ビルド成功のみ。
 - **バックエンドなし**。全状態はクライアント内（React state + Cookie）で完結。実行時の外部通信は `index.css` にインライン化された Google Fonts の CSS `@import`（クロスオリジンのフォント取得）のみで、オフライン時はシステムフォントにフォールバック。アイコン・`manifest.json` 等のアセットは同一オリジン。起動音は合成音のため音声ファイルの取得も行わない（§7.1 / §11.4）。
 
@@ -38,6 +38,7 @@ BrewRig は **コーヒードリップの湯量管理タイマー** (PWA)。世�
 ```
 App (src/App.tsx)                     … 全状態と全ビジネスロジックを保持する単一の親
 ├─ ConfirmDialog / FlavorHelpDialog   (components/Dialogs.tsx)
+├─ UpdateToast                        (components/UpdateToast.tsx) … 新バージョン通知（§11.7）
 ├─ Header                             (components/Header.tsx)
 │    ├─ LangToggle (JP|EN)
 │    └─ ThemeToggle (🌙/☀️)   … ≤560px でハンバーガーメニューに集約
@@ -276,6 +277,8 @@ interface Recipe {
 | `confirmState` | 閉 | 確認ダイアログ状態 `{open, message, onOk}` |
 | `menuOpen` | false | ハンバーガーメニュー開閉 |
 
+このほか `useSwUpdate()`（§11.7）が新バージョン検知フラグ `updateReady` を、`useTimerPip()`（§6.6）が PiP 表示中フラグを内部 state として持つ。
+
 ### 5.2 ref
 
 | ref | 用途 |
@@ -489,6 +492,8 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 
 `vite-plugin-singlefile` により JS/CSS を HTML にインライン化（`assetsInlineLimit: 100_000_000`, `cssCodeSplit: false`）。`base: './'` で GitHub Pages のサブパス配信に対応。
 
+**SW のビルド ID 埋め込み**: `vite.config.ts` の自作プラグイン `swBuildId`（`apply: 'build'`、`closeBundle`）が、ビルド完了後に `dist/` 配下の全ファイル（`sw.js` 自身を除く）の内容から SHA-256 を計算し、先頭 12 桁を `dist/sw.js` の `__BUILD_ID__` に埋め込む。中身が変わるたびに `sw.js` のバイト列が変わり、ブラウザが SW 更新を検知できる（§11.3 / §11.7）。プレースホルダが見つからなければビルドを失敗させる。
+
 ### 11.2 manifest.json の配置（非自明・重要）
 
 - `manifest.json` は `public/` ではなく**プロジェクト直下**（`index.html` の隣）に置く。
@@ -500,8 +505,15 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 
 ### 11.3 Service Worker（`public/sw.js`）
 
-- `CACHE_NAME = 'brewrig-v3'`。install で `ASSETS` を precache、activate で旧キャッシュ削除、fetch は cache-first（文書は失敗時 `./index.html` にフォールバック）。
-- **`ASSETS` に旧バンドル時代の名残**（`./app.js`, `./app.css`, `./assets/submit-button-click2.mp3`）が含まれ、singlefile 化後の実ファイル名（インライン化済み HTML / `_submit-button-click2.mp3`）と一致しない。これらは本番で 404 になるため、`cache.addAll`（1 件でも失敗すると全体が reject）が失敗し、**SW の install 自体が成功していない**（＝オフライン対応・precache は現状機能していない。2026-10 に本番 URL で確認）。触る場合は要確認。
+- **キャッシュ名**: `brewrig:<scope>:<BUILD_ID>`。`<scope>` は `self.registration.scope`、`<BUILD_ID>` はビルド時に埋め込む（§11.1）。scope を含めるのは、本番 (`/brewrig/`) と プレビュー (`/brewrig/preview/`) の SW が Cache Storage を共有しても互いのキャッシュを消さないため。
+- **install**: `ASSETS`（`./`, `./index.html`, `./manifest.json`, `./credits.html`, `./assets/favicon.svg`, `./assets/icon-192.png`, `./assets/icon-512.png`, `./assets/icon-padding-192.png`, `./assets/icon-padding-512.png`, `./assets/icon-padding.svg` = **すべて実在するファイル**）を precache し、`skipWaiting()`。`cache.addAll` は 1 件でも失敗すると install 全体が失敗するため、`ASSETS` には dist に実在するファイルだけを並べること。
+- **activate**: 自 scope の旧ビルドのキャッシュ（`brewrig:<scope>:` で始まり現ビルド以外）と、旧版のキャッシュ `brewrig-v3` を削除し、`clients.claim()`。
+- **fetch**:
+  - GET 以外・クロスオリジン（Google Fonts 等）は SW で扱わない（ブラウザ既定。オフライン時はシステムフォントにフォールバック）。
+  - **ナビゲーション（HTML）は network-first**: ネットワーク応答（`ok`）をキャッシュに保存して返す。失敗、または **4 秒**以内に応答がなければキャッシュ（同 URL → `./index.html`）を返す。オンライン時は常に最新版が出るため、古い HTML に固定されない。
+  - **それ以外の同一オリジン GET は cache-first**: キャッシュになければ取得し、`ok` ならキャッシュに保存。
+- **履歴**: 2026-10 以前の `sw.js`（`CACHE_NAME='brewrig-v3'`、cache-first）は、`ASSETS` に旧バンドル時代の存在しないファイル（`./app.js` 等）を含んでいたため install が常に失敗し、オフライン対応は機能していなかった。旧バンドル時代に正常に入った SW が残る端末は、本修正で `sw.js` が変わることで新 SW に置き換わり、`brewrig-v3` も削除される。
+- `public/assets/_submit-button-click2.mp3` はアプリから参照されないため `ASSETS` に含めない（§11.4）。
 
 ### 11.4 起動音は合成音（外部音声ファイル非依存）
 
@@ -516,10 +528,18 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 ### 11.6 index.html（エントリ HTML）
 
 - **テーマの先行適用**: `<head>` 内 inline script が Cookie `theme=light` なら `<html>` に `data-theme="light"` を付ける（§10.4）。
-- **SW 登録**: inline script が `window` の `load` イベントで `navigator.serviceWorker.register('./sw.js')` を実行（失敗は `console.warn`）。SW 登録はここだけで、`src/` 側からは行わない。
+- **SW 登録は `index.html` では行わない**。`src/hooks/swUpdate.ts` が**本番ビルド（`import.meta.env.PROD`）のときだけ**登録する（§11.7）。開発サーバ（`npm run dev`）で SW がモジュールをキャッシュして変更が反映されなくなるのを防ぐため。
 - **PWA / 表示メタ**: `theme-color = #1a1108`、`apple-mobile-web-app-capable = yes`、`apple-mobile-web-app-status-bar-style = black-translucent`、`apple-mobile-web-app-title = BrewRig`、`apple-touch-icon = ./assets/icon-192.png`、`<link rel="icon">` = `favicon.svg`、`<link rel="manifest" href="./manifest.json">`。
 - **OGP**: `og:title = BrewRig`、`og:description`、`og:type = website`、`og:url`（公開 URL）。`<meta name="description">` あり、ドキュメント言語は `<html lang="ja">`。
 - `<script type="module" src="/src/main.tsx">` が唯一のエントリ（ビルド時に単一 HTML へインライン化）。
+
+### 11.7 SW 登録と更新通知（`src/hooks/swUpdate.ts` / `src/components/UpdateToast.tsx`）
+
+- **登録**: `useSwUpdate()` が、本番ビルドかつ `'serviceWorker' in navigator` のときだけ、`load` 後に `navigator.serviceWorker.register('./sw.js')`（失敗は `console.warn`）。
+- **更新チェック**: ブラウザ既定（ナビゲーション時）に加え、アプリが可視に戻ったとき（`visibilitychange`）に `registration.update()` を呼ぶ。PWA を開いたまま長時間置いた後にデプロイがあっても検知できる。
+- **検知**: `controllerchange` で判定する。**既に別の SW に制御されていた状態で** controller が替わったときだけ `updateReady=true`（初回インストール時の claim では通知しない）。
+- **通知**: `UpdateToast` を画面下に表示（「新しいバージョンがあります」＋「再読み込み」＋閉じる）。閉じると同セッション中は再表示しない。自動では再読み込みしない。
+- **再読み込み**: 抽出中（`isPlaying || currentTime > 0`）は確認ダイアログ（`confirmReload`：タイマーがリセットされる旨）を挟む。アイドル時は即 `location.reload()`。
 
 ---
 
@@ -532,7 +552,7 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
   - `main` への push 時は入力がないため `vars.PREVIEW_REF` を参照する。未設定なら次の push でプレビューは消える（Pages は毎回サイト全体を置き換えるため）。
   - `base: './'` の相対パス設計なのでサブパスでもそのまま動く。PWA の `start_url`/scope も相対のため本番とは別アプリとしてインストールされる（名前は同じ「BrewRig」）。
   - Cookie は `path=/` のため本番と共有される（レシピ・音量・言語・テーマ等）。
-  - SW: preview 側の `sw.js` は scope `/brewrig/preview/` で本番 (`/brewrig/`) と別登録になるが、`CACHE_NAME` が同名のため Cache Storage を共有する。現状は §11.3 の `ASSETS` 不整合で SW のインストール自体が失敗しているため実害はないが、SW を修正する際はプレビューとの干渉を考慮すること。
+  - SW: preview 側の `sw.js` は scope `/brewrig/preview/` で本番 (`/brewrig/`) と別登録になる。Cache Storage はオリジン共有だが、キャッシュ名に scope を含め、削除も自 scope 分に限るため互いに干渉しない（§11.3）。preview 側 SW が登録されるまでの初回アクセスは本番 SW の scope 内として扱われ、本番側キャッシュに preview の HTML が載ることがあるが、URL が異なるため実害はない。
 - `concurrency: {group: pages, cancel-in-progress: false}` … 進行中デプロイは中断せず順番待ち。
 - 権限は最小（`contents: read`, `pages: write`, `id-token: write`）。
 
@@ -544,7 +564,7 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 2. **`src/audio/se.ts` の命名・バリアント構造を変えない**（オリジナルとのパリティ保持）。
 3. **`SegSlider` の壊れた `calc()` を「直さない」**（見た目の再現のため意図的）。
 4. **`manifest.json` の配置と `assetFileNames` の関数を維持**（SW キャッシュとの整合）。
-5. `public/` にアセットを追加するときは SW の `ASSETS` リストとの整合を確認。
+5. `public/` にアセットを追加・削除するときは SW の `ASSETS` リストを同期する（**存在しないファイルを 1 件でも含めると SW の install が失敗する**）。`sw.js` の `__BUILD_ID__` プレースホルダは消さない（ビルドが失敗する）。
 6. TypeScript は `strict` だが未使用変数チェックは OFF（直訳由来の未使用変数を残すため）。CI ゲートは `npm run build`。
 7. `noWater` ステップは湯量表示・TTS 湯量読み上げの抑止対象。新ステップ追加時は各バッジ/表示分岐（TimerCard）と TTS 分岐（tts-phrases）の両方を確認。
 
@@ -564,6 +584,8 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 | `src/audio/tts-phrases.ts` | ステップ→TTS 文言組み立て（値マッチ） |
 | `src/hooks/cookie.ts` | Cookie 読み書き |
 | `src/hooks/wakeLock.ts` | 計時中の画面スリープ防止（Screen Wake Lock） |
+| `src/hooks/swUpdate.ts` | SW 登録（本番のみ）と新バージョン検知 |
+| `src/components/UpdateToast.tsx` | 新バージョン通知トースト |
 | `src/hooks/timerPip.ts` | タイマーの PiP 表示（canvas → video PiP + Media Session、試験的） |
 | `src/utils/format.ts` | `formatTime`（mm:ss）・`isMobileUserAgent` |
 | `src/components/Header.tsx` | ヘッダー（言語/テーマ/ハンバーガー） |
@@ -574,11 +596,11 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 | `src/components/Dialogs.tsx` | 確認ダイアログ + 味わい説明ダイアログ |
 | `src/index.css` | 全スタイル（CSS 変数テーマ、単一ファイル） |
 | `manifest.json` | PWA マニフェスト（**プロジェクト直下**） |
-| `public/sw.js` | Service Worker（precache + cache-first） |
+| `public/sw.js` | Service Worker（precache、HTML は network-first / 他は cache-first） |
 | `public/credits.html` | 静的クレジットページ |
-| `vite.config.ts` | 単一ファイル化 + manifest 配置特例 |
+| `vite.config.ts` | 単一ファイル化 + manifest 配置特例 + SW ビルド ID 埋め込み |
 | `.github/workflows/deploy.yml` | GitHub Pages デプロイ |
 
 ---
 
-_初版はコミット `64d6b04`（音声ガイダンス TTS 追加）時点で作成。以後、起動音の合成音化・手動 audit スクリプトの撤去・**タイマーの実時計化（P1 キャッチアップ）**・画面スリープ防止・言語/テーマの Cookie 保存・`<html>` へのテーマ先行適用・**PiP 表示（試験的、§6.6）**・試作ブランチのプレビュー併設公開（§12）を反映済みで、現行 `main` の実装と整合。_
+_初版はコミット `64d6b04`（音声ガイダンス TTS 追加）時点で作成。以後、起動音の合成音化・手動 audit スクリプトの撤去・**タイマーの実時計化（P1 キャッチアップ）**・画面スリープ防止・言語/テーマの Cookie 保存・`<html>` へのテーマ先行適用・**PiP 表示（試験的、§6.6）**・試作ブランチのプレビュー併設公開（§12）・**SW の修正（オフライン対応の復旧、§11.3）と更新通知（§11.7）**を反映済みで、現行 `main` の実装と整合。_

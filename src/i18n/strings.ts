@@ -36,6 +36,10 @@ export interface Strings {
   pipReady: string;
   pipPourTo: (amount: string) => string;
   overtime: (sec: number) => string;
+  updateReady: string;
+  updateReload: string;
+  confirmReload: string;
+  close: string;
   seOn: string;
   seOff: string;
   timelineTitle: string;
@@ -147,6 +151,10 @@ const ja: Strings = {
   pipReady: 'スタート待機中',
   pipPourTo: (amount) => `${amount} まで`,
   overtime: (sec) => `${sec >= 60 ? '60s+' : `${sec}s`}:超過`,
+  updateReady: '新しいバージョンがあります',
+  updateReload: '再読み込み',
+  confirmReload: '再読み込みすると抽出中のタイマーはリセットされます。再読み込みしますか？',
+  close: '閉じる',
   seOn: '🔔 SE: ON',
   seOff: '🔇 SE: OFF',
   timelineTitle: '投入タイムライン',
@@ -270,6 +278,10 @@ const en: Strings = {
   pipReady: 'Ready',
   pipPourTo: (amount) => `up to ${amount}`,
   overtime: (sec) => `${sec >= 60 ? '60s+' : `${sec}s`}:over`,
+  updateReady: 'A new version is available',
+  updateReload: 'Reload',
+  confirmReload: 'Reloading will reset the running timer. Reload now?',
+  close: 'Close',
   seOn: '🔔 SE: ON',
   seOff: '🔇 SE: OFF',
   timelineTitle: 'Pour Timeline',

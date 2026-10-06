@@ -13,6 +13,7 @@ import { getStrings } from './i18n/strings';
 import { getCookie, setCookie } from './hooks/cookie';
 import { useWakeLock } from './hooks/wakeLock';
 import { useTimerPip } from './hooks/timerPip';
+import { useSwUpdate } from './hooks/swUpdate';
 import {
   ensureRunning,
   getAudioContext,
@@ -28,6 +29,7 @@ import { RecipeCard } from './components/RecipeCard';
 import { SettingsCard } from './components/SettingsCard';
 import { TimerCard } from './components/TimerCard';
 import { ConfirmDialog, FlavorHelpDialog } from './components/Dialogs';
+import { UpdateToast } from './components/UpdateToast';
 
 const FINISH_SENTINEL = 99;
 
@@ -85,6 +87,8 @@ export function App() {
     onOk: () => {},
   });
   const [menuOpen, setMenuOpen] = useState(false);
+  const updateReady = useSwUpdate();
+  const [updateDismissed, setUpdateDismissed] = useState(false);
 
   // Refs
   const tickRef = useRef<number | null>(null);
@@ -442,6 +446,18 @@ export function App() {
     pip.toggle();
   };
 
+  const reloadForUpdate = () => {
+    if (isPlaying || currentTime > 0) {
+      setConfirmState({
+        open: true,
+        message: t.confirmReload,
+        onOk: () => window.location.reload(),
+      });
+    } else {
+      window.location.reload();
+    }
+  };
+
   const cancelConfirm = useCallback(() => {
     setConfirmState((c) => ({ ...c, open: false }));
   }, []);
@@ -464,6 +480,13 @@ export function App() {
         onCancel={cancelConfirm}
         lang={lang}
       />
+      {updateReady && !updateDismissed && (
+        <UpdateToast
+          lang={lang}
+          onReload={reloadForUpdate}
+          onClose={() => setUpdateDismissed(true)}
+        />
+      )}
       {flavorHelpOpen && (
         <FlavorHelpDialog
           onClose={() => setFlavorHelpOpen(false)}
