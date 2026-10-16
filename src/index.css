@@ -63,3 +63,4 @@
 .update-toast-msg{flex:1}
 .update-toast-reload{white-space:nowrap;padding:.4rem .8rem;font-size:.8rem}
 .update-toast-close{color:var(--text-dim);cursor:pointer;background:0 0;border:0;padding:0 .3rem;font-size:1.2rem;line-height:1}
+.dialog-note{color:var(--text-dim);text-align:center;margin:-.75rem 0 1.25rem;font-size:.78rem;line-height:1.5}

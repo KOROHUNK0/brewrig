@@ -12,6 +12,7 @@ export function ConfirmDialog({ state, onCancel, lang }: ConfirmProps) {
     <div className="dialog-overlay" onClick={onCancel}>
       <div className="dialog-box" onClick={(e) => e.stopPropagation()}>
         <p className="dialog-msg">{state.message}</p>
+        {state.note && <p className="dialog-note">{state.note}</p>}
         <div className="dialog-actions">
           <button
             className="btn btn-ghost dialog-cancel"
