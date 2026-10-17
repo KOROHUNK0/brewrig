@@ -83,30 +83,32 @@ export function useExitConfirmOnBack(
   openRef.current = exitConfirmOpen;
   const openExitRef = useRef(openExitConfirm);
   openExitRef.current = openExitConfirm;
+  // Re-created whenever the confirm opens or closes. On a real device, a
+  // watcher kept across "back → confirm → Cancel" (or re-created inside the
+  // previous one's close event) did not catch the next back and the app
+  // exited. Re-creating on close runs right after the Cancel tap, so the new
+  // watcher gets its own group with fresh user activation. If the one made
+  // while the confirm is up is ineffective, back falls through to the native
+  // exit — the intended result in that state anyway.
   useEffect(() => {
     const Ctor = getCloseWatcher();
     if (!enabled || !Ctor) return;
-    let w: CloseWatcherLike;
-    const arm = () => {
-      w = new Ctor();
-      w.oncancel = (e) => {
-        // Confirm already up: let it through to `close` → exit.
-        if (openRef.current) return;
-        e.preventDefault();
-        openExitRef.current();
-      };
-      w.onclose = () => {
-        if (openRef.current) {
-          exitApp();
-          return;
-        }
-        // No user activation since the last back, so `cancel` was skipped
-        // and this watcher is spent. Re-arm and still ask before exiting.
-        arm();
-        openExitRef.current();
-      };
+    const w = new Ctor();
+    w.oncancel = (e) => {
+      // Confirm already up: let it through to `close` → exit.
+      if (openRef.current) return;
+      e.preventDefault();
+      openExitRef.current();
     };
-    arm();
+    w.onclose = () => {
+      if (openRef.current) {
+        exitApp();
+        return;
+      }
+      // No user activation since the last back, so `cancel` was skipped and
+      // this watcher is spent. Still ask; opening re-arms via this effect.
+      openExitRef.current();
+    };
     return () => w.destroy();
-  }, [enabled]);
+  }, [enabled, exitConfirmOpen]);
 }
