@@ -15,6 +15,11 @@ import { useWakeLock } from './hooks/wakeLock';
 import { useTimerPip } from './hooks/timerPip';
 import { useSwUpdate } from './hooks/swUpdate';
 import {
+  exitApp,
+  useCloseOnBack,
+  useExitConfirmOnBack,
+} from './hooks/backGuard';
+import {
   ensureRunning,
   getAudioContext,
   playFinish,
@@ -461,6 +466,24 @@ export function App() {
   const cancelConfirm = useCallback(() => {
     setConfirmState((c) => ({ ...c, open: false }));
   }, []);
+
+  // Android back gesture in the installed PWA (§6.8): close the open overlay,
+  // or ask before exiting when nothing is open.
+  const exitConfirmOpen = confirmState.open && confirmState.kind === 'exit';
+  useCloseOnBack(menuOpen, () => setMenuOpen(false));
+  useCloseOnBack(flavorHelpOpen, () => setFlavorHelpOpen(false));
+  useCloseOnBack(confirmState.open && !exitConfirmOpen, cancelConfirm);
+  useExitConfirmOnBack(exitConfirmOpen, () => {
+    setMenuOpen(false);
+    setConfirmState({
+      open: true,
+      kind: 'exit',
+      message:
+        isPlaying || currentTime > 0 ? t.confirmExitBrewing : t.confirmExit,
+      note: t.exitBackNote,
+      onOk: exitApp,
+    });
+  });
 
   // Audio context for SE (kept alive via ref; used implicitly by se.ts).
   useEffect(() => {

@@ -39,6 +39,9 @@ export interface Strings {
   updateReady: string;
   updateReload: string;
   confirmReload: string;
+  confirmExit: string;
+  confirmExitBrewing: string;
+  exitBackNote: string;
   close: string;
   seOn: string;
   seOff: string;
@@ -154,6 +157,9 @@ const ja: Strings = {
   updateReady: '新しいバージョンがあります',
   updateReload: '再読み込み',
   confirmReload: '再読み込みすると抽出中のタイマーはリセットされます。再読み込みしますか？',
+  confirmExit: 'アプリを終了しますか？',
+  confirmExitBrewing: '進行中のタイマーはリセットされます。アプリを終了しますか？',
+  exitBackNote: 'この画面でもう一度戻る操作をすると、確認なしで終了します。',
   close: '閉じる',
   seOn: '🔔 SE: ON',
   seOff: '🔇 SE: OFF',
@@ -281,6 +287,9 @@ const en: Strings = {
   updateReady: 'A new version is available',
   updateReload: 'Reload',
   confirmReload: 'Reloading will reset the running timer. Reload now?',
+  confirmExit: 'Exit the app?',
+  confirmExitBrewing: 'The running timer will be reset. Exit the app?',
+  exitBackNote: 'Going back again on this screen exits without asking.',
   close: 'Close',
   seOn: '🔔 SE: ON',
   seOff: '🔇 SE: OFF',

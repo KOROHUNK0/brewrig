@@ -3,6 +3,7 @@ import type { Lang, RecipeId } from '../types';
 import { RECIPES, isRecommended } from '../data/recipes';
 import { getStrings } from '../i18n/strings';
 import { RecipeLabel } from './RecipeLabel';
+import { useCloseOnBack } from '../hooks/backGuard';
 interface Props {
   value: RecipeId;
   onChange(id: RecipeId): void;
@@ -12,6 +13,7 @@ export function RecipeDropdown({ value, onChange, lang }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   const s = getStrings(lang);
+  useCloseOnBack(open, () => setOpen(false));
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {

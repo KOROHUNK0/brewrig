@@ -67,5 +67,10 @@ export interface Recipe {
 export interface ConfirmState {
   open: boolean;
   message: string;
+  // Small supplementary line under the message.
+  note?: string;
+  // 'exit' = the back-gesture exit confirm (§6.8); it gets no close-on-back
+  // watcher because back while it is showing exits the app.
+  kind?: 'exit';
   onOk: () => void;
 }

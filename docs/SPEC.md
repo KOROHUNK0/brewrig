@@ -274,7 +274,7 @@ interface Recipe {
 | `activeStep` | `0` | 現在アクティブなステップ index（null=なし） |
 | `finished` | false | 抽出完了フラグ |
 | `highlightStep` | null | 点火直後 2 秒だけハイライトする index（パルス演出） |
-| `confirmState` | 閉 | 確認ダイアログ状態 `{open, message, onOk}` |
+| `confirmState` | 閉 | 確認ダイアログ状態 `{open, message, note?, kind?, onOk}`。`note` は本文下の小さな注釈、`kind: 'exit'` は戻る操作による終了確認（§6.8） |
 | `menuOpen` | false | ハンバーガーメニュー開閉 |
 
 このほか `useSwUpdate()`（§11.7）が新バージョン検知フラグ `updateReady` を、`useTimerPip()`（§6.6）が PiP 表示中フラグを内部 state として持つ。
@@ -381,6 +381,25 @@ currentTime = anchorSec + floor((performance.now() − anchorPerf) / 1000)
 `SettingsCard` の `locked = isPlaying || currentTime>0`:
 - 粉量数値入力は `readOnly`/`disabled`。ロック中に入力欄をタップすると `guardChange`（リセット確認）が発火。
 - 味わい・濃度・±ボタンは `guardChange` 経由（リセットを挟んでから変更）。
+
+### 6.8 戻る操作（`src/hooks/backGuard.ts`、PWA のみ）
+
+インストール済み PWA で Android の戻るジェスチャー／戻るボタンを押すと、従来はアプリが即座に閉じて状態が失われていた。これを次のように扱う。
+
+| 状態 | 戻る操作の結果 |
+| --- | --- |
+| ハンバーガーメニュー / レシピドロップダウン / 味わいヘルプ / 確認ダイアログを表示中 | それを閉じる（確認ダイアログはキャンセル扱い） |
+| 何も表示していない | 終了確認ダイアログを出す（待機中・抽出中を問わず常に） |
+| 終了確認を表示中 | アプリを終了（`window.close()`） |
+| 終了確認で OK / キャンセル | 終了 / ダイアログを閉じてアプリに残る |
+
+- **文言**: 待機中は `confirmExit`（「アプリを終了しますか？」）、抽出中（`isPlaying \|\| currentTime>0`）は `confirmExitBrewing`（「進行中のタイマーはリセットされます。アプリを終了しますか？」）。本文下に注釈 `exitBackNote`（「この画面でもう一度戻る操作をすると、確認なしで終了します。」）。
+- **方式**: `CloseWatcher` API（Chrome 120+）。`history.pushState` による履歴トラップは採用しない。理由は (1) ユーザー操作なしに積んだ履歴エントリは Chrome の戻る操作でスキップされ、戻る操作の直後に再設置できない、(2) 履歴エントリが 2 件以上あると `window.close()` がブロックされ「OK で終了」ができない、の 2 点。
+- **構成**: 最下層に終了ガード用の watcher を 1 つ常駐させ（`useExitConfirmOnBack`）、各オーバーレイは開いている間だけ自分用の watcher を持つ（`useCloseOnBack`）。オーバーレイはタップで開くため watcher が別グループになり、1 回の戻る操作で最上位の 1 つだけが閉じる。
+- **CloseWatcher の悪用防止仕様との関係**: 戻る操作を打ち消せる `cancel` イベントは「前回の戻る操作以降にユーザー操作があった」ときだけ発火する。ユーザー操作がない場合は watcher が `close` で消費されるので、`close` 内で終了確認を出す（確認表示中なら終了する）。これにより、タップを挟まなくても「1 回目＝確認、2 回目＝終了」が成り立つ。
+- **終了ガードの再生成**: 終了ガードの watcher は終了確認の開閉のたびに作り直す（`exitConfirmOpen` を effect の依存に含める）。実機で、同じ watcher を「戻る → 確認 → キャンセル」の後も使い続けた場合（または前の watcher の `close` 内で再生成した場合）に次の戻る操作を受け取れず終了してしまったため。閉じたときの再生成はキャンセルのタップ直後に走るので、新しいユーザー操作を伴う別グループになる。
+- **有効条件**: `CloseWatcher` 対応 かつ モバイル UA（`isMobileUserAgent`） かつ `display-mode: standalone`（変化も監視）。ブラウザのタブでは従来どおりの戻る操作。デスクトップ PWA では `Esc` が close request になり「Esc で終了」になってしまうため対象外。iOS（CloseWatcher 非対応）も何もしない。
+- **既知の制約**: `window.close()` が失敗した場合（想定外）はダイアログが閉じるだけで残る。Android 実機での検証が必要。
 
 ---
 
@@ -585,6 +604,7 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 | `src/hooks/cookie.ts` | Cookie 読み書き |
 | `src/hooks/wakeLock.ts` | 計時中の画面スリープ防止（Screen Wake Lock） |
 | `src/hooks/swUpdate.ts` | SW 登録（本番のみ）と新バージョン検知 |
+| `src/hooks/backGuard.ts` | PWA での戻る操作（オーバーレイを閉じる / 終了確認、CloseWatcher） |
 | `src/components/UpdateToast.tsx` | 新バージョン通知トースト |
 | `src/hooks/timerPip.ts` | タイマーの PiP 表示（canvas → video PiP + Media Session、試験的） |
 | `src/utils/format.ts` | `formatTime`（mm:ss）・`isMobileUserAgent` |
@@ -603,4 +623,4 @@ SettingsCard の「?」ボタンで開くダイアログ。味わい選択の 2 
 
 ---
 
-_初版はコミット `64d6b04`（音声ガイダンス TTS 追加）時点で作成。以後、起動音の合成音化・手動 audit スクリプトの撤去・**タイマーの実時計化（P1 キャッチアップ）**・画面スリープ防止・言語/テーマの Cookie 保存・`<html>` へのテーマ先行適用・**PiP 表示（試験的、§6.6）**・試作ブランチのプレビュー併設公開（§12）・**SW の修正（オフライン対応の復旧、§11.3）と更新通知（§11.7）**を反映済みで、現行 `main` の実装と整合。_
+_初版はコミット `64d6b04`（音声ガイダンス TTS 追加）時点で作成。以後、起動音の合成音化・手動 audit スクリプトの撤去・**タイマーの実時計化（P1 キャッチアップ）**・画面スリープ防止・言語/テーマの Cookie 保存・`<html>` へのテーマ先行適用・**PiP 表示（試験的、§6.6）**・試作ブランチのプレビュー併設公開（§12）・**SW の修正（オフライン対応の復旧、§11.3）と更新通知（§11.7）**・**PWA での戻る操作（オーバーレイを閉じる / 終了確認、§6.8）**を反映済みで、現行 `main` の実装と整合。_
